@@ -184,8 +184,8 @@
           <i class="fa-solid fa-medal text-yellow-300"></i>
           <span>Başarı Rozetleri</span>
         </button>
-        <button onclick="switchTab('settings')" id="tab-btn-settings" class="nav-tab flex items-center gap-2 px-3 py-1.5 rounded-lg font-medium transition text-white/80 hover:text-white hover:bg-white/10">
-          <i class="fa-solid fa-cloud text-cyan-300"></i>
+        <button onclick="switchTab('settings')" id="tab-btn-settings" class="nav-tab flex items-center gap-2 px-3 py-1.5 rounded-lg font-medium transition text-white/80 hover:text-white hover:bg-white/10" title="Şifre Korumalı Öğretmen Paneli">
+          <i class="fa-solid fa-lock text-cyan-300 text-xs"></i>
           <span>Bulut & Ayarlar</span>
         </button>
       </nav>
@@ -673,14 +673,20 @@
     <section id="view-settings" class="tab-view hidden space-y-6">
       
       <!-- Top Settings Hero -->
-      <div class="bg-gradient-to-r from-blue-700 via-indigo-700 to-slate-800 rounded-3xl p-6 sm:p-8 text-white shadow-lg">
-        <div class="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-2">
-          <i class="fa-solid fa-cloud text-sky-300"></i> Bulut & İletişim Entegrasyonu
+      <div class="bg-gradient-to-r from-blue-700 via-indigo-700 to-slate-800 rounded-3xl p-6 sm:p-8 text-white shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div class="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-2">
+            <i class="fa-solid fa-user-shield text-amber-300"></i> Öğretmen & Veli Yönetim Paneli
+          </div>
+          <h2 class="text-2xl sm:text-3xl font-extrabold font-['Outfit']">Öğretmen Bildirim & Bulut Ayarları</h2>
+          <p class="text-blue-100 text-xs sm:text-sm mt-1 max-w-2xl">
+            Google Drive senkronizasyonu, günlük karne e-postaları ve Pazar haftalık gelişim raporu ayarlarını buradan yönetebilirsiniz.
+          </p>
         </div>
-        <h2 class="text-2xl sm:text-3xl font-extrabold font-['Outfit']">Öğretmen Bildirim & Bulut Ayarları</h2>
-        <p class="text-blue-100 text-xs sm:text-sm mt-1 max-w-2xl">
-          Google Drive klasör senkronizasyonu, tamamlanan ödevlerde öğretmeninize anında e-posta gitmesi ve WhatsApp günlük ödev paylaşımı ayarlarını buradan yönetebilirsiniz.
-        </p>
+        <button type="button" onclick="lockTeacherSettings()" title="Öğretmen oturumunu kapat ve öğrenci moduna dön" class="bg-rose-500 hover:bg-rose-600 active:scale-95 text-white font-bold px-4 py-3 rounded-2xl text-xs flex items-center gap-2 transition shadow-lg border border-rose-400/30 flex-shrink-0 cursor-pointer self-start sm:self-center">
+          <i class="fa-solid fa-lock text-sm"></i>
+          <span>Ayarları Kilitle & Çık</span>
+        </button>
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -718,6 +724,20 @@
               </label>
               <input type="url" id="settingAppsScriptUrl" placeholder="https://script.google.com/macros/s/.../exec" class="w-full text-sm font-mono border border-slate-300 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50">
               <span class="text-[11px] text-slate-400 mt-0.5 block">Soruların Google Drive klasörünüze gitmesi ve Gmail gönderimi için gereklidir.</span>
+            </div>
+
+            <!-- PIN Kodu Yönetimi -->
+            <div class="pt-2 pb-1 border-t border-slate-100 space-y-1.5">
+              <label for="settingCurrentPinDisplay" class="block text-xs font-bold text-slate-800">
+                🔒 Öğretmen PIN Kodu (Giriş Şifresi):
+              </label>
+              <div class="flex items-center gap-2">
+                <input type="text" id="settingCurrentPinDisplay" value="1984" maxlength="6" class="w-28 text-center text-sm font-mono font-bold border border-slate-300 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="1984">
+                <button type="button" onclick="updateTeacherPinFromSettings()" class="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs px-3.5 py-2 rounded-xl border border-slate-200 transition flex items-center gap-1.5 cursor-pointer">
+                  <i class="fa-solid fa-arrows-rotate text-blue-600"></i> PIN'i Güncelle
+                </button>
+              </div>
+              <span class="text-[11px] text-slate-400 block">Varsayılan PIN: <strong>1984</strong>. Öğrencinizin ayarları değiştirmesini ve verileri sıfırlamasını engeller.</span>
             </div>
 
             <div class="flex flex-wrap gap-2 pt-1">
@@ -1268,6 +1288,87 @@
     </div>
   </div>
 
+  <!-- ========================================== -->
+  <!-- MODAL: ÖĞRETMEN GİRİŞİ & AYARLAR KİLİDİ (PIN) -->
+  <!-- ========================================== -->
+  <div id="teacherPinModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden transition-opacity">
+    <div class="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-sm w-full overflow-hidden animate-in fade-in zoom-in duration-200">
+      
+      <!-- Modal Header -->
+      <div class="bg-gradient-to-r from-slate-900 via-indigo-900 to-slate-800 text-white px-5 py-4 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-2xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-lg text-indigo-300">
+            <i class="fa-solid fa-lock"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold font-['Outfit']">Öğretmen Girişi</h3>
+            <p class="text-[11px] text-slate-300">Bulut & Ayarlar Şifre Korumalıdır</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeTeacherPinModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition cursor-pointer">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-5 space-y-4">
+        <p class="text-xs text-slate-600 text-center leading-relaxed">
+          Bu alan öğretmen ve veli ayarlarını içerir. Giriş yapmak için <strong>4 haneli Öğretmen PIN kodunu</strong> giriniz:
+        </p>
+
+        <!-- PIN Display / Input Field -->
+        <div class="space-y-2">
+          <div class="relative">
+            <input type="password" id="teacherPinInput" maxlength="6" inputmode="numeric" pattern="[0-9]*" placeholder="••••" autocomplete="off"
+                   class="w-full text-center text-3xl font-mono font-bold tracking-[0.4em] py-3.5 bg-slate-50 border-2 border-slate-300 rounded-2xl focus:border-indigo-600 focus:bg-white focus:outline-none transition text-slate-800"
+                   onkeydown="handlePinKeydown(event)">
+            <button type="button" onclick="togglePinVisibility()" id="btnTogglePinVisibility" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-sm">
+              <i class="fa-solid fa-eye" id="pinEyeIcon"></i>
+            </button>
+          </div>
+
+          <!-- Error Message Display -->
+          <div id="pinErrorMessage" class="hidden text-xs text-rose-600 font-bold bg-rose-50 border border-rose-200 rounded-xl p-2.5 text-center flex items-center justify-center gap-1.5">
+            <i class="fa-solid fa-circle-exclamation"></i>
+            <span id="pinErrorText">Hatalı PIN kodu! (Varsayılan: 1984)</span>
+          </div>
+        </div>
+
+        <!-- Touch-Friendly Numeric Keypad -->
+        <div class="grid grid-cols-3 gap-2 pt-1 select-none">
+          <button type="button" onclick="appendPinDigit('1')" class="h-12 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-800 font-bold text-lg transition flex items-center justify-center cursor-pointer">1</button>
+          <button type="button" onclick="appendPinDigit('2')" class="h-12 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-800 font-bold text-lg transition flex items-center justify-center cursor-pointer">2</button>
+          <button type="button" onclick="appendPinDigit('3')" class="h-12 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-800 font-bold text-lg transition flex items-center justify-center cursor-pointer">3</button>
+          
+          <button type="button" onclick="appendPinDigit('4')" class="h-12 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-800 font-bold text-lg transition flex items-center justify-center cursor-pointer">4</button>
+          <button type="button" onclick="appendPinDigit('5')" class="h-12 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-800 font-bold text-lg transition flex items-center justify-center cursor-pointer">5</button>
+          <button type="button" onclick="appendPinDigit('6')" class="h-12 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-800 font-bold text-lg transition flex items-center justify-center cursor-pointer">6</button>
+          
+          <button type="button" onclick="appendPinDigit('7')" class="h-12 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-800 font-bold text-lg transition flex items-center justify-center cursor-pointer">7</button>
+          <button type="button" onclick="appendPinDigit('8')" class="h-12 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-800 font-bold text-lg transition flex items-center justify-center cursor-pointer">8</button>
+          <button type="button" onclick="appendPinDigit('9')" class="h-12 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-800 font-bold text-lg transition flex items-center justify-center cursor-pointer">9</button>
+          
+          <button type="button" onclick="clearPinInput()" class="h-12 rounded-xl bg-rose-50 hover:bg-rose-100 active:scale-95 text-rose-600 font-bold text-xs transition flex items-center justify-center cursor-pointer">Temizle</button>
+          <button type="button" onclick="appendPinDigit('0')" class="h-12 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-800 font-bold text-lg transition flex items-center justify-center cursor-pointer">0</button>
+          <button type="button" onclick="backspacePinDigit()" class="h-12 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 font-bold text-base transition flex items-center justify-center cursor-pointer">
+            <i class="fa-solid fa-delete-left"></i>
+          </button>
+        </div>
+
+        <!-- Submit & Cancel Buttons -->
+        <div class="pt-2 flex items-center gap-2">
+          <button type="button" onclick="closeTeacherPinModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 font-bold py-3 rounded-xl text-xs transition cursor-pointer">
+            Vazgeç
+          </button>
+          <button type="button" onclick="verifyTeacherPin()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold py-3 rounded-xl text-xs shadow-md transition flex items-center justify-center gap-2 cursor-pointer">
+            <i class="fa-solid fa-unlock"></i> Giriş Yap
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
   <!-- MOBILE BOTTOM NAVIGATION BAR -->
   <nav class="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200/90 shadow-[0_-4px_25px_rgba(0,0,0,0.08)] px-1 py-1 flex justify-around items-center safe-area-bottom">
     <button onclick="switchTab('today')" id="mobile-tab-btn-today" class="mobile-nav-btn active flex flex-col items-center justify-center flex-1 py-1.5 text-blue-600 transition touch-manipulation">
@@ -1300,8 +1401,11 @@
       <i class="fa-solid fa-medal text-base"></i>
       <span class="text-[9px] font-medium mt-0.5">Rozet</span>
     </button>
-    <button onclick="switchTab('settings')" id="mobile-tab-btn-settings" class="mobile-nav-btn flex flex-col items-center justify-center flex-1 py-1.5 text-slate-500 hover:text-slate-800 transition touch-manipulation">
-      <i class="fa-solid fa-sliders text-base"></i>
+    <button onclick="switchTab('settings')" id="mobile-tab-btn-settings" class="mobile-nav-btn flex flex-col items-center justify-center flex-1 py-1.5 text-slate-500 hover:text-slate-800 transition touch-manipulation" title="Şifre Korumalı Öğretmen Ayarları">
+      <div class="relative">
+        <i class="fa-solid fa-sliders text-base"></i>
+        <i class="fa-solid fa-lock text-[8px] absolute -top-1 -right-2 text-amber-500"></i>
+      </div>
       <span class="text-[9px] font-medium mt-0.5">Ayar</span>
     </button>
   </nav>
@@ -1310,7 +1414,7 @@
   <audio id="successAudio" preload="auto" src="https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3"></audio>
 
   <!-- Load Data and Main Script -->
-  <script src="data.js?v=20261009_20"></script>
-  <script src="app.js?v=20261009_20"></script>
+  <script src="data.js?v=20261010_21"></script>
+  <script src="app.js?v=20261010_21"></script>
 </body>
 </html>

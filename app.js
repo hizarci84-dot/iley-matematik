@@ -17,7 +17,8 @@ let appState = {
     appsScriptUrl: 'https://script.google.com/macros/s/AKfycby_JPXodqPxDRZOYk2cERsu8AUPZxirSvpT_icQ8D_yIeYQwoq7SxaY6kLbKaSEKaLxfg/exec',
     teacherEmail: 'hizarci84@gmail.com',
     parentEmails: 'alperuygur33@gmail.com, melon55@gmail.com',
-    whatsappGroup: '120363430881572129@g.us'
+    whatsappGroup: '120363430881572129@g.us',
+    teacherPin: '1984'
   },
   questionsFilter: 'all',
   currentSelectedImageBase64: null,
@@ -82,7 +83,8 @@ function loadProgress() {
       appsScriptUrl: 'https://script.google.com/macros/s/AKfycby_JPXodqPxDRZOYk2cERsu8AUPZxirSvpT_icQ8D_yIeYQwoq7SxaY6kLbKaSEKaLxfg/exec',
       teacherEmail: 'hizarci84@gmail.com',
       parentEmails: 'alperuygur33@gmail.com, melon55@gmail.com',
-      whatsappGroup: '120363430881572129@g.us'
+      whatsappGroup: '120363430881572129@g.us',
+      teacherPin: '1984'
     };
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
@@ -91,6 +93,7 @@ function loadProgress() {
       appState.testResults = parsed.testResults || {};
       appState.questions = parsed.questions || [];
       appState.cloudSettings = Object.assign(defaultCloud, parsed.cloudSettings || {});
+      if (!appState.cloudSettings.teacherPin) appState.cloudSettings.teacherPin = '1984';
       appState.xp = parsed.xp || 0;
       appState.streak = parsed.streak || 0;
       appState.lastStreakDate = parsed.lastStreakDate || null;
@@ -339,6 +342,12 @@ function initCalendarDate() {
 
 // Tab Switching
 function switchTab(tabId) {
+  // Öğretmen PIN Koruması: Ayarlar sekmesine sadece şifre girilmişse izin ver
+  if (tabId === 'settings' && !isTeacherAuthenticated()) {
+    openTeacherPinModal();
+    return;
+  }
+
   appState.activeTab = tabId;
   document.querySelectorAll('.tab-view').forEach(el => el.classList.add('hidden'));
   
@@ -2628,22 +2637,26 @@ function loadCloudSettingsToInputs() {
   const scriptUrlInput = document.getElementById('settingAppsScriptUrl');
   const teacherEmailInput = document.getElementById('settingTeacherEmail');
   const parentEmailsInput = document.getElementById('settingParentEmails');
+  const pinInput = document.getElementById('settingCurrentPinDisplay');
 
   if (scriptUrlInput) scriptUrlInput.value = appState.cloudSettings.appsScriptUrl || '';
   if (teacherEmailInput) teacherEmailInput.value = appState.cloudSettings.teacherEmail || 'hizarci84@gmail.com';
   if (parentEmailsInput) parentEmailsInput.value = appState.cloudSettings.parentEmails || 'alperuygur33@gmail.com, melon55@gmail.com';
+  if (pinInput) pinInput.value = appState.cloudSettings.teacherPin || '1984';
 }
 
 function saveCloudSettings() {
   const scriptUrlInput = document.getElementById('settingAppsScriptUrl');
   const teacherEmailInput = document.getElementById('settingTeacherEmail');
   const parentEmailsInput = document.getElementById('settingParentEmails');
+  const pinInput = document.getElementById('settingCurrentPinDisplay');
 
   appState.cloudSettings = {
     appsScriptUrl: (scriptUrlInput?.value || '').trim(),
     teacherEmail: (teacherEmailInput?.value || '').trim(),
     parentEmails: (parentEmailsInput?.value || '').trim(),
-    whatsappGroup: '120363430881572129@g.us'
+    whatsappGroup: '120363430881572129@g.us',
+    teacherPin: (pinInput?.value || appState.cloudSettings.teacherPin || '1984').trim()
   };
 
   saveProgress();
@@ -2652,7 +2665,7 @@ function saveCloudSettings() {
   // Arka planda çalışma takvimini ve ayarları Apps Script'e senkronize et
   syncScheduleToCloudQuietly();
 
-  alert("Bulut & E-Posta ayarları başarıyla kaydedildi!\n\n• Öğretmen: " + appState.cloudSettings.teacherEmail + "\n• Veliler: " + appState.cloudSettings.parentEmails);
+  alert("Bulut & E-Posta ayarları başarıyla kaydedildi!\n\n• Öğretmen: " + appState.cloudSettings.teacherEmail + "\n• Veliler: " + appState.cloudSettings.parentEmails + "\n• Öğretmen PIN: " + appState.cloudSettings.teacherPin);
 }
 
 function getCompactSchedule() {
@@ -2985,6 +2998,131 @@ function toggleSetupGuide() {
   }
 }
 
+// ================================================================
+// BÖLÜM: ÖĞRETMEN PIN KODU KORUMASI (GÜVENLİK)
+// ================================================================
+function isTeacherAuthenticated() {
+  return sessionStorage.getItem('iley_teacher_auth') === 'true';
+}
+
+function getTeacherPin() {
+  return (appState.cloudSettings && appState.cloudSettings.teacherPin) ? String(appState.cloudSettings.teacherPin).trim() : '1984';
+}
+
+function openTeacherPinModal() {
+  const modal = document.getElementById('teacherPinModal');
+  const input = document.getElementById('teacherPinInput');
+  const errBox = document.getElementById('pinErrorMessage');
+  if (errBox) errBox.classList.add('hidden');
+  if (input) {
+    input.value = '';
+    input.type = 'password';
+  }
+  const eyeIcon = document.getElementById('pinEyeIcon');
+  if (eyeIcon) {
+    eyeIcon.className = 'fa-solid fa-eye';
+  }
+  if (modal) modal.classList.remove('hidden');
+  setTimeout(() => {
+    if (input) input.focus();
+  }, 100);
+}
+
+function closeTeacherPinModal() {
+  const modal = document.getElementById('teacherPinModal');
+  if (modal) modal.classList.add('hidden');
+}
+
+function appendPinDigit(digit) {
+  const input = document.getElementById('teacherPinInput');
+  const errBox = document.getElementById('pinErrorMessage');
+  if (errBox) errBox.classList.add('hidden');
+  if (input && input.value.length < 6) {
+    input.value += digit;
+    if (input.value.length === 4) {
+      verifyTeacherPin();
+    }
+  }
+}
+
+function backspacePinDigit() {
+  const input = document.getElementById('teacherPinInput');
+  const errBox = document.getElementById('pinErrorMessage');
+  if (errBox) errBox.classList.add('hidden');
+  if (input && input.value.length > 0) {
+    input.value = input.value.slice(0, -1);
+  }
+}
+
+function clearPinInput() {
+  const input = document.getElementById('teacherPinInput');
+  const errBox = document.getElementById('pinErrorMessage');
+  if (errBox) errBox.classList.add('hidden');
+  if (input) input.value = '';
+}
+
+function togglePinVisibility() {
+  const input = document.getElementById('teacherPinInput');
+  const eyeIcon = document.getElementById('pinEyeIcon');
+  if (!input) return;
+  if (input.type === 'password') {
+    input.type = 'text';
+    if (eyeIcon) eyeIcon.className = 'fa-solid fa-eye-slash';
+  } else {
+    input.type = 'password';
+    if (eyeIcon) eyeIcon.className = 'fa-solid fa-eye';
+  }
+}
+
+function handlePinKeydown(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    verifyTeacherPin();
+  }
+}
+
+function verifyTeacherPin() {
+  const input = document.getElementById('teacherPinInput');
+  const errBox = document.getElementById('pinErrorMessage');
+  const enteredPin = (input ? input.value : '').trim();
+  const correctPin = getTeacherPin();
+
+  if (enteredPin === correctPin) {
+    sessionStorage.setItem('iley_teacher_auth', 'true');
+    closeTeacherPinModal();
+    switchTab('settings');
+    showToastNotification('🔓 Öğretmen girişi başarılı!');
+  } else {
+    if (errBox) {
+      errBox.classList.remove('hidden');
+    }
+    if (input) {
+      input.value = '';
+      input.focus();
+    }
+    if (navigator.vibrate) navigator.vibrate(200);
+  }
+}
+
+function lockTeacherSettings() {
+  sessionStorage.removeItem('iley_teacher_auth');
+  switchTab('today');
+  showToastNotification('🔒 Ayarlar kilitlendi. Öğrenci moduna dönüldü.');
+}
+
+function updateTeacherPinFromSettings() {
+  const pinInput = document.getElementById('settingCurrentPinDisplay');
+  const newPin = (pinInput ? pinInput.value : '').trim();
+  if (!newPin || newPin.length < 4) {
+    alert('Lütfen en az 4 basamaklı bir PIN kodu belirleyiniz.');
+    return;
+  }
+  if (!appState.cloudSettings) appState.cloudSettings = {};
+  appState.cloudSettings.teacherPin = newPin;
+  saveProgress();
+  alert(`✅ Öğretmen PIN kodu başarıyla güncellendi!\nYeni PIN: ${newPin}\n\nBundan sonra "Bulut & Ayarlar" paneline bu PIN kodu ile giriş yapabilirsiniz.`);
+}
+
 // Global window bağlamaları
 window.initPwaAndCloud = initPwaAndCloud;
 window.promptPwaInstall = promptPwaInstall;
@@ -3013,5 +3151,20 @@ window.syncProgressFromCloud = syncProgressFromCloud;
 window.toggleSetupGuide = toggleSetupGuide;
 window.sendWeeklyReportNow = sendWeeklyReportNow;
 window.setupWeeklyReportAutomation = setupWeeklyReportAutomation;
+
+// Öğretmen Güvenlik Bağlamaları
+window.isTeacherAuthenticated = isTeacherAuthenticated;
+window.getTeacherPin = getTeacherPin;
+window.openTeacherPinModal = openTeacherPinModal;
+window.closeTeacherPinModal = closeTeacherPinModal;
+window.appendPinDigit = appendPinDigit;
+window.backspacePinDigit = backspacePinDigit;
+window.clearPinInput = clearPinInput;
+window.togglePinVisibility = togglePinVisibility;
+window.handlePinKeydown = handlePinKeydown;
+window.verifyTeacherPin = verifyTeacherPin;
+window.lockTeacherSettings = lockTeacherSettings;
+window.updateTeacherPinFromSettings = updateTeacherPinFromSettings;
+
 
 
