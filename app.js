@@ -17,7 +17,6 @@ let appState = {
     appsScriptUrl: 'https://script.google.com/macros/s/AKfycby_JPXodqPxDRZOYk2cERsu8AUPZxirSvpT_icQ8D_yIeYQwoq7SxaY6kLbKaSEKaLxfg/exec',
     teacherEmail: 'hizarci84@gmail.com',
     parentEmails: 'alperuygur33@gmail.com, melon55@gmail.com',
-    whatsappGroup: '120363430881572129@g.us',
     teacherPin: '1984'
   },
   questionsFilter: 'all',
@@ -83,7 +82,6 @@ function loadProgress() {
       appsScriptUrl: 'https://script.google.com/macros/s/AKfycby_JPXodqPxDRZOYk2cERsu8AUPZxirSvpT_icQ8D_yIeYQwoq7SxaY6kLbKaSEKaLxfg/exec',
       teacherEmail: 'hizarci84@gmail.com',
       parentEmails: 'alperuygur33@gmail.com, melon55@gmail.com',
-      whatsappGroup: '120363430881572129@g.us',
       teacherPin: '1984'
     };
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -93,6 +91,7 @@ function loadProgress() {
       appState.testResults = parsed.testResults || {};
       appState.questions = parsed.questions || [];
       appState.cloudSettings = Object.assign(defaultCloud, parsed.cloudSettings || {});
+      delete appState.cloudSettings.whatsappGroup;
       if (!appState.cloudSettings.teacherPin) appState.cloudSettings.teacherPin = '1984';
       appState.xp = parsed.xp || 0;
       appState.streak = parsed.streak || 0;
@@ -2053,20 +2052,13 @@ async function shareTodayWhatsApp() {
   await copyTextSafely(msg);
 
   const encodedMsg = encodeURIComponent(msg);
-  const inputEl = document.getElementById('settingWhatsappGroup');
-  const targetGroup = (inputEl ? inputEl.value : (appState.cloudSettings.whatsappGroup || '')).trim();
+  // WhatsApp Evrensel Paylaşım URL'si: Telefon numarası olmadan açıldığında
+  // WhatsApp doğrudan "Kime gönderilsin?" (kişi/grup seçimi) ekranını açar ve mesajı hazır bekletir.
+  const whatsappUrl = `https://api.whatsapp.com/send?text=${encodedMsg}`;
 
-  // Telefon numarası girilmişse
-  const cleanPhone = targetGroup.replace(/[^0-9]/g, '');
-  let whatsappUrl = `https://api.whatsapp.com/send?text=${encodedMsg}`;
-
-  if (cleanPhone.length >= 10 && !targetGroup.includes('chat.whatsapp.com')) {
-    whatsappUrl = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodedMsg}`;
-  }
-
-  showToastNotification("💬 WhatsApp açılıyor...");
+  showToastNotification("💬 WhatsApp açılıyor! Rapor panoya da kopyalandı.");
   
-  // WhatsApp'ı açmayı dene
+  // WhatsApp'ı aç
   const opened = window.open(whatsappUrl, '_blank');
   if (!opened || opened.closed || typeof opened.closed === 'undefined') {
     window.location.href = whatsappUrl;
@@ -2655,7 +2647,6 @@ function saveCloudSettings() {
     appsScriptUrl: (scriptUrlInput?.value || '').trim(),
     teacherEmail: (teacherEmailInput?.value || '').trim(),
     parentEmails: (parentEmailsInput?.value || '').trim(),
-    whatsappGroup: '120363430881572129@g.us',
     teacherPin: (pinInput?.value || appState.cloudSettings.teacherPin || '1984').trim()
   };
 
