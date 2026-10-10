@@ -1163,12 +1163,16 @@
           </select>
         </div>
 
-        <!-- Test & Soru Bilgisi -->
+        <!-- Sayfa & Soru Bilgisi -->
         <div>
-          <label for="questionTitleInput" class="block text-xs font-bold text-slate-800 mb-1">
-            🏷️ Test ve Soru Numarası / Konu:
+          <label for="questionTitleInput" class="block text-xs font-bold text-slate-800 mb-1 flex items-center justify-between">
+            <span>🏷️ Sayfa No, Soru No / Etkinlik veya Test Adı:</span>
+            <span class="text-[11px] text-rose-600 font-semibold">Sayfa ve soru no yazılabilir</span>
           </label>
-          <input type="text" id="questionTitleInput" required placeholder="Örn: Test 3, Soru 7 - Çarpanlar ve Katlar" class="w-full text-xs sm:text-sm border border-slate-300 rounded-xl px-3.5 py-2.5 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-rose-500">
+          <input type="text" id="questionTitleInput" required placeholder="Örn: Sayfa 6, Soru 2 / Sayfa 7, Etkinlik B / Test 3, Soru 7" class="w-full text-xs sm:text-sm border border-slate-300 rounded-xl px-3.5 py-2.5 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-rose-500">
+          <p class="text-[11px] text-slate-500 mt-1">
+            💡 Etkinliklerde veya testlerde takıldığın sorunun sayfa ve soru numarasını doğrudan buraya yazabilirsin (Örn: <strong>Sayfa 6, Soru 2</strong>).
+          </p>
         </div>
 
         <!-- Öğrencinin Notu -->
@@ -1414,7 +1418,7 @@
   <audio id="successAudio" preload="auto" src="https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3"></audio>
 
   <!-- Load Data and Main Script -->
-  <script src="data.js?v=20261010_23"></script>
-  <script src="app.js?v=20261010_23"></script>
+  <script src="data.js?v=20261010_24"></script>
+  <script src="app.js?v=20261010_24"></script>
 </body>
 </html>

@@ -2234,6 +2234,18 @@ function openUploadQuestionModal(defaultBook, defaultTitle) {
   const noteInput = document.getElementById('questionNoteInput');
   const statusEl = document.getElementById('questionUploadStatus');
 
+  // Eğer parametre verilmemişse günün aktif görevinden otomatik tahmin et
+  if (!defaultBook && !defaultTitle && STUDY_DATA && STUDY_DATA.schedule) {
+    const curDay = STUDY_DATA.schedule.find(d => d.date === appState.currentDateStr);
+    if (curDay && curDay.tasks && curDay.tasks[0]) {
+      const t = curDay.tasks[0];
+      defaultBook = t.bookCode || t.book;
+      if (t.pages) {
+        defaultTitle = `Sayfa ${t.pages}, Soru `;
+      }
+    }
+  }
+
   if (bookSelect && defaultBook) {
     if (defaultBook.includes('isem')) bookSelect.value = 'isem';
     else if (defaultBook.includes('parkur')) bookSelect.value = 'parkur';
