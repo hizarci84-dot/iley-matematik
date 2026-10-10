@@ -1,0 +1,212 @@
+/* Custom styles for Iley 6th Grade Math Schedule - 100% Mobile & Touch Optimized */
+
+/* Safe Area Insets for Modern Mobile Devices (iPhone notch & home indicator) */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+}
+
+.safe-area-top {
+  padding-top: calc(0.5rem + var(--sat));
+}
+
+.safe-area-bottom {
+  padding-bottom: calc(0.4rem + var(--sab));
+}
+
+/* Touch & Tap Optimization */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button, input, select, a {
+  touch-action: manipulation;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Active Nav Tab (Desktop Header) */
+.active-tab {
+  background-color: rgba(255, 255, 255, 0.22);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.2);
+}
+
+/* Mobile Bottom Navigation Bar Buttons */
+.mobile-nav-btn {
+  user-select: none;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.mobile-nav-btn.active {
+  color: #2563eb !important;
+}
+.mobile-nav-btn.active i {
+  transform: translateY(-2px);
+  filter: drop-shadow(0 2px 4px rgba(37, 99, 235, 0.3));
+}
+.mobile-nav-btn.active span {
+  font-weight: 700 !important;
+}
+.mobile-nav-btn:active {
+  transform: scale(0.92);
+}
+
+/* Optical Question Row */
+.optical-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background-color: #f8fafc;
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  transition: all 0.15s ease-in-out;
+  touch-action: pan-y;
+}
+@media (min-width: 640px) {
+  .optical-row {
+    padding: 10px 16px;
+  }
+}
+.optical-row:hover {
+  background-color: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+/* Optical Bubbles */
+.bubble-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 2px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  font-weight: 700;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.12s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+  touch-action: manipulation;
+}
+@media (max-width: 360px) {
+  .bubble-btn {
+    width: 33px;
+    height: 33px;
+    font-size: 12px;
+  }
+}
+.bubble-btn:hover {
+  border-color: #3b82f6;
+  color: #1d4ed8;
+  background-color: #eff6ff;
+  transform: translateY(-1px);
+}
+.bubble-btn:active {
+  transform: scale(0.92);
+}
+.bubble-btn.selected {
+  background: #2563eb;
+  border-color: #1d4ed8;
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.35);
+  transform: scale(1.05);
+}
+
+/* Verification State for Bubbles */
+.bubble-btn.is-correct {
+  background: #10b981 !important;
+  border-color: #059669 !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.3) !important;
+}
+.bubble-btn.is-wrong {
+  background: #ef4444 !important;
+  border-color: #dc2626 !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.3) !important;
+}
+.bubble-btn.is-correct-target {
+  border-color: #10b981 !important;
+  background: #ecfdf5 !important;
+  color: #047857 !important;
+  font-weight: 800 !important;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2) !important;
+}
+
+/* Task Card Hover Animations */
+.task-card {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.task-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px -2px rgba(0, 0, 0, 0.06);
+}
+.task-card:active {
+  transform: scale(0.99);
+}
+
+/* Print Stylesheet for Physical Homework Hanging Sheet */
+@media print {
+  header, nav, #datePickerInput, button, select, #view-settings, #view-badges, #view-books {
+    display: none !important;
+  }
+  
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 11pt !important;
+  }
+  
+  main {
+    max-width: 100% !important;
+    padding: 0 !important;
+  }
+  
+  #view-schedule {
+    display: block !important;
+  }
+  
+  .print-header {
+    display: block !important;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #000;
+    padding-bottom: 10px;
+  }
+  
+  .schedule-week-block {
+    page-break-inside: avoid;
+    border: 1px solid #ccc !important;
+    margin-bottom: 15px !important;
+  }
+  
+  .task-card {
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: none !important;
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "name": "İley 6. Sınıf Matematik Çalışma & Deneme Programı",
+  "short_name": "İley Matematik",
+  "description": "İley için 6. Sınıf Matematik Günlük Ödev, Soru Bankası ve 6 Jumbo Deneme Takip Uygulaması",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f8fafc",
+  "theme_color": "#1d4ed8",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["education", "kids", "productivity"]
+}
