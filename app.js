@@ -1144,6 +1144,17 @@ function renderBadgesView() {
   });
 }
 
+// Görevin bir Etkinlik mi yoksa Çoktan Seçmeli Test/Deneme mi olduğunu belirleyen yardımcı fonksiyon
+function isActivityTask(task) {
+  if (!task) return false;
+  if (task.type === 'activity') return true;
+  const title = (task.title || '').toLowerCase();
+  const detail = (task.detail || '').toLowerCase();
+  const desc = (task.desc || '').toLowerCase();
+  if (title.includes('etkinlik') || detail.includes('etkinlik') || desc.includes('etkinlik')) return true;
+  return false;
+}
+
 // ================================================================
 // DOĞRU / YANLIŞ / BOŞ VE TEST SONUÇ KONTROL MODALI
 // ================================================================
@@ -1176,11 +1187,19 @@ function openOpticalModal(taskId) {
     qCount = 20;
   }
 
+  const isActivity = isActivityTask(targetTask);
+
   // Başlıklar
   const titleEl = document.getElementById('modalTestTitle');
   const subEl = document.getElementById('modalTestSubtitle');
   if (titleEl) titleEl.innerText = `${targetTask.book}: ${targetTask.title}`;
-  if (subEl) subEl.innerText = `Soru sayısını, doğru, yanlış ve boş sayılarını giriniz (${qCount} Soru)`;
+  if (subEl) {
+    if (isActivity) {
+      subEl.innerText = `Etkinlik tamamlama ve kontrol girişi (${qCount} Soru / Alıştırma)`;
+    } else {
+      subEl.innerText = `Soru sayısını, doğru, yanlış ve boş sayılarını giriniz (${qCount} Soru)`;
+    }
+  }
 
   // Girdi Kutularını Doldur
   const totalInput = document.getElementById('modalTotalQuestions');
@@ -1200,8 +1219,34 @@ function openOpticalModal(taskId) {
   // Canlı Net ve Yüzdeyi Hesapla
   onDirectScoreChange('init');
 
-  // Kitap Cevap Anahtarını Hazırla
-  renderModalAnswerKeyContent();
+  // Bölüm 2: Kitap Cevap Anahtarı ve Bölüm 3: İsteğe Bağlı Optik Form Kartları
+  const answerKeyCard = document.getElementById('modalAnswerKeyCard');
+  const opticalCard = document.getElementById('modalOpticalCard');
+  const hasAnswers = (targetTask.answers && targetTask.answers.length > 0) || 
+                     (targetTask.tests && targetTask.tests.length > 0);
+
+  if (isActivity) {
+    // 🚫 ETKİNLİK BÖLÜMÜ:
+    // Kullanıcı talebi: Etkinlik bölümlerinde isteğe bağlı optik form girişi kesinlikle olmasın
+    if (opticalCard) opticalCard.classList.add('hidden');
+    
+    // Etkinliklerde şıklı cevap anahtarı da olmadığı için cevap anahtarı kutusunu da gizle
+    if (answerKeyCard) {
+      if (hasAnswers) {
+        answerKeyCard.classList.remove('hidden');
+        renderModalAnswerKeyContent();
+      } else {
+        answerKeyCard.classList.add('hidden');
+      }
+    }
+  } else {
+    // ✅ ÇOKTAN SEÇMELİ TESTLER VE DENEMELER:
+    // Optik form kartı ve cevap anahtarı kartını göster
+    if (opticalCard) opticalCard.classList.remove('hidden');
+    if (answerKeyCard) answerKeyCard.classList.remove('hidden');
+    renderModalAnswerKeyContent();
+    renderOpticalSheet();
+  }
 
   // Açılır kutuları varsayılan kapalı tut
   const keyBox = document.getElementById('fullAnswerKeyBox');
@@ -1213,9 +1258,6 @@ function openOpticalModal(taskId) {
   if (optSection) optSection.classList.add('hidden');
   const iconOpt = document.getElementById('iconToggleOptical');
   if (iconOpt) iconOpt.className = 'fa-solid fa-chevron-down text-slate-400 transition-transform';
-
-  // Optik Form Baloncuklarını Hazırla
-  renderOpticalSheet();
 
   // Buton Event Listener'larını bağla
   attachModalEventListeners();
@@ -1273,7 +1315,9 @@ function adjustTotalQuestions(delta) {
   if (empInput) empInput.value = emp;
 
   onDirectScoreChange('total');
-  renderOpticalSheet();
+  if (!isActivityTask(appState.activeModalTask)) {
+    renderOpticalSheet();
+  }
 }
 
 function setTotalQuestions(val) {
@@ -3156,6 +3200,7 @@ window.handlePinKeydown = handlePinKeydown;
 window.verifyTeacherPin = verifyTeacherPin;
 window.lockTeacherSettings = lockTeacherSettings;
 window.updateTeacherPinFromSettings = updateTeacherPinFromSettings;
+window.isActivityTask = isActivityTask;
 
 
 
