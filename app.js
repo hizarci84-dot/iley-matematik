@@ -34,7 +34,6 @@ let appState = {
   activeDenemeSubTab: 'jumbo', // 'jumbo' | 'general'
   generalChartFilter: 'all',   // 'all' | 'tr' | 'mat' | 'fen' | 'sos' | 'din' | 'ing' | 'pct'
   editingGeneralTrialId: null,
-  tempTrialPhotoBase64: null,
   tempTrialSubjects: [],
   // Timer State
   timerMode: 'pomodoro', // 'pomodoro' (25m), 'deneme' (40m), 'stopwatch'
@@ -1723,7 +1722,6 @@ function renderGeneralTrialsList() {
 
 function openGeneralTrialModal(trialId = null) {
   appState.editingGeneralTrialId = trialId;
-  appState.tempTrialPhotoBase64 = null;
 
   const modal = document.getElementById('generalTrialModal');
   const modalTitle = document.getElementById('generalTrialModalTitle');
@@ -1735,14 +1733,6 @@ function openGeneralTrialModal(trialId = null) {
   const rankClass = document.getElementById('trialRankClass');
   const pointsInput = document.getElementById('trialPoints');
   const notesInput = document.getElementById('trialNotes');
-  const photoName = document.getElementById('trialPhotoName');
-  const photoPrevContainer = document.getElementById('trialPhotoPreviewContainer');
-  const photoPreview = document.getElementById('trialPhotoPreview');
-  const btnRemovePhoto = document.getElementById('btnRemoveTrialPhoto');
-
-  if (photoName) photoName.innerText = 'Fotoğraf seçilmedi';
-  if (photoPrevContainer) photoPrevContainer.classList.add('hidden');
-  if (btnRemovePhoto) btnRemovePhoto.classList.add('hidden');
 
   if (trialId) {
     // Düzenleme Modu
@@ -1761,14 +1751,6 @@ function openGeneralTrialModal(trialId = null) {
 
     // Dersleri Klonla
     appState.tempTrialSubjects = JSON.parse(JSON.stringify(trial.subjects || []));
-
-    if (trial.photoUrl) {
-      appState.tempTrialPhotoBase64 = trial.photoUrl;
-      if (photoName) photoName.innerText = 'Kayıtlı fotoğraf mevcut';
-      if (photoPreview) photoPreview.src = trial.photoUrl;
-      if (photoPrevContainer) photoPrevContainer.classList.remove('hidden');
-      if (btnRemovePhoto) btnRemovePhoto.classList.remove('hidden');
-    }
   } else {
     // Yeni Ekleme Modu
     if (modalTitle) modalTitle.innerText = 'Genel Deneme Sınavı Veri Girişi';
@@ -1795,7 +1777,6 @@ function closeGeneralTrialModal() {
   const modal = document.getElementById('generalTrialModal');
   if (modal) modal.classList.add('hidden');
   appState.editingGeneralTrialId = null;
-  appState.tempTrialPhotoBase64 = null;
 }
 
 function initDefaultTempTrialSubjects(templateKey = '90') {
@@ -1986,43 +1967,6 @@ function removeCustomGeneralSubject(code) {
   recalculateTrialLiveSummary();
 }
 
-// Sınav Sonuç Belgesi Fotoğrafı
-function handleTrialPhotoSelect(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    const rawData = e.target.result;
-    // Sıkıştır
-    compressImageBase64(rawData, 1200, (compressed) => {
-      appState.tempTrialPhotoBase64 = compressed;
-      const photoName = document.getElementById('trialPhotoName');
-      const photoPrevContainer = document.getElementById('trialPhotoPreviewContainer');
-      const photoPreview = document.getElementById('trialPhotoPreview');
-      const btnRemove = document.getElementById('btnRemoveTrialPhoto');
-
-      if (photoName) photoName.innerText = file.name || 'Fotoğraf seçildi';
-      if (photoPreview) photoPreview.src = compressed;
-      if (photoPrevContainer) photoPrevContainer.classList.remove('hidden');
-      if (btnRemove) btnRemove.classList.remove('hidden');
-    });
-  };
-  reader.readAsDataURL(file);
-}
-
-function clearTrialPhoto() {
-  appState.tempTrialPhotoBase64 = null;
-  const photoInput = document.getElementById('trialPhotoInput');
-  const photoName = document.getElementById('trialPhotoName');
-  const photoPrevContainer = document.getElementById('trialPhotoPreviewContainer');
-  const btnRemove = document.getElementById('btnRemoveTrialPhoto');
-
-  if (photoInput) photoInput.value = '';
-  if (photoName) photoName.innerText = 'Fotoğraf seçilmedi';
-  if (photoPrevContainer) photoPrevContainer.classList.add('hidden');
-  if (btnRemove) btnRemove.classList.add('hidden');
-}
 
 // Genel Denemeyi Kaydet (Submit)
 function saveGeneralTrialSubmit(event) {
@@ -2071,7 +2015,6 @@ function saveGeneralTrialSubmit(event) {
     rankClass,
     scorePoints: points,
     notes,
-    photoUrl: appState.tempTrialPhotoBase64 || '',
     updatedAt: new Date().toISOString()
   };
 
@@ -2239,19 +2182,6 @@ function openGeneralTrialDetail(trialId) {
             <i class="fa-solid fa-pen-nib text-amber-600"></i> Sınav Değerlendirme Notu:
           </span>
           <p class="text-slate-700 leading-relaxed pl-5">${trial.notes}</p>
-        </div>
-      ` : ''}
-
-      <!-- Sınav Sonuç Belgesi Fotoğrafı (Varsa) -->
-      ${trial.photoUrl ? `
-        <div class="border border-slate-200 rounded-2xl p-4 bg-white space-y-2">
-          <span class="font-bold text-slate-800 text-xs flex items-center gap-1.5">
-            <i class="fa-solid fa-camera text-indigo-600"></i> Sınav Sonuç Belgesi Fotoğrafı:
-          </span>
-          <div class="text-center">
-            <img src="${trial.photoUrl}" alt="Sonuç Belgesi" onclick="zoomImage('${trial.photoUrl}', '${trial.name} - Sonuç Belgesi', '')" class="max-h-72 mx-auto rounded-xl shadow-sm border border-slate-200 object-contain cursor-pointer hover:opacity-95 transition">
-            <p class="text-[10px] text-slate-400 mt-1">Büyütmek için fotoğrafa dokunabilirsiniz</p>
-          </div>
         </div>
       ` : ''}
     `;

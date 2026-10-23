@@ -1731,27 +1731,6 @@
             <textarea id="trialNotes" rows="2" placeholder="Örn: Matematikte yeni nesil sorular zorladı, fen ve din çok başarılı geçti..." class="w-full text-xs border border-slate-300 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"></textarea>
           </div>
 
-          <!-- Sınav Sonuç Belgesi Fotoğrafı -->
-          <div>
-            <label class="block text-[11px] font-bold text-slate-700 mb-1">
-              📸 Sınav Sonuç Belgesi / Karne Fotoğrafı (İsteğe Bağlı):
-            </label>
-            <div class="flex items-center gap-3">
-              <label class="bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 font-bold text-xs px-3.5 py-2 rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-sm">
-                <i class="fa-solid fa-camera text-indigo-600"></i>
-                <span>Fotoğraf Çek / Seç</span>
-                <input type="file" id="trialPhotoInput" accept="image/*" capture="environment" onchange="handleTrialPhotoSelect(event)" class="hidden">
-              </label>
-              <span id="trialPhotoName" class="text-xs text-slate-500">Fotoğraf seçilmedi</span>
-              <button type="button" id="btnRemoveTrialPhoto" onclick="clearTrialPhoto()" class="hidden text-xs text-rose-600 hover:text-rose-700 font-bold cursor-pointer">
-                Kaldır
-              </button>
-            </div>
-            <div id="trialPhotoPreviewContainer" class="hidden mt-2">
-              <img id="trialPhotoPreview" src="" alt="Sonuç Belgesi" class="max-h-40 rounded-xl border border-slate-300 object-contain shadow-sm">
-            </div>
-          </div>
-
         </div>
 
         <!-- Submit & Kapat Footer -->
@@ -1858,7 +1837,7 @@
   <audio id="successAudio" preload="auto" src="https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3"></audio>
 
   <!-- Load Data and Main Script -->
-  <script src="data.js?v=20261023_genel1"></script>
-  <script src="app.js?v=20261023_genel1"></script>
+  <script src="data.js?v=20261023_genel2"></script>
+  <script src="app.js?v=20261023_genel2"></script>
 </body>
 </html>
