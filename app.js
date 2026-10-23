@@ -76,11 +76,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // Responsive Canvas Chart Redraw
   window.addEventListener('resize', () => {
     if (appState.activeTab === 'denemeler') {
-      if (appState.activeDenemeSubTab === 'general') {
-        renderGeneralTrialsChart();
-      } else {
-        renderDenemelerView();
-      }
+      renderDenemelerView();
+    } else if (appState.activeTab === 'genel-denemeler') {
+      renderGeneralTrialsChart();
     }
   });
 });
@@ -384,7 +382,7 @@ function switchTab(tabId) {
 
   // Mobile Bottom Nav Tabs
   document.querySelectorAll('.mobile-nav-btn').forEach(btn => {
-    btn.classList.remove('active', 'text-blue-600', 'text-amber-600', 'text-emerald-600', 'text-purple-600', 'text-slate-800');
+    btn.classList.remove('active', 'text-blue-600', 'text-amber-600', 'text-indigo-600', 'text-rose-600', 'text-emerald-600', 'text-purple-600', 'text-slate-800');
     btn.classList.add('text-slate-500');
   });
   const targetMobileBtn = document.getElementById(`mobile-tab-btn-${tabId}`);
@@ -392,6 +390,7 @@ function switchTab(tabId) {
     targetMobileBtn.classList.add('active');
     targetMobileBtn.classList.remove('text-slate-500');
     if (tabId === 'denemeler') targetMobileBtn.classList.add('text-amber-600');
+    else if (tabId === 'genel-denemeler') targetMobileBtn.classList.add('text-indigo-600');
     else if (tabId === 'questions') targetMobileBtn.classList.add('text-rose-600');
     else if (tabId === 'books') targetMobileBtn.classList.add('text-emerald-600');
     else if (tabId === 'badges') targetMobileBtn.classList.add('text-purple-600');
@@ -408,13 +407,8 @@ function switchTab(tabId) {
   // Refresh tab-specific renders
   if (tabId === 'today') renderTodayView();
   else if (tabId === 'schedule') renderScheduleView();
-  else if (tabId === 'denemeler') {
-    if (appState.activeDenemeSubTab === 'general') {
-      renderGeneralTrialsView();
-    } else {
-      renderDenemelerView();
-    }
-  }
+  else if (tabId === 'denemeler') renderDenemelerView();
+  else if (tabId === 'genel-denemeler') renderGeneralTrialsView();
   else if (tabId === 'books') renderBooksView();
   else if (tabId === 'badges') renderBadgesView();
   else if (tabId === 'questions') renderQuestionsView();
@@ -461,11 +455,8 @@ function setupTouchGestures() {
 function renderAllViews() {
   renderTodayView();
   renderScheduleView();
-  if (appState.activeDenemeSubTab === 'general') {
-    renderGeneralTrialsView();
-  } else {
-    renderDenemelerView();
-  }
+  renderDenemelerView();
+  renderGeneralTrialsView();
   updateGeneralTrialsCountBadge();
   renderBooksView();
   renderBadgesView();
@@ -1097,12 +1088,21 @@ function switchDenemeSubTab(subTab) {
 function updateGeneralTrialsCountBadge() {
   const count = (appState.generalTrials || []).length;
   const badge = document.getElementById('generalTrialsCountBadge');
+  const mobileBadge = document.getElementById('mobileBadgeGenelDenemeCount');
   if (badge) {
     if (count > 0) {
       badge.innerText = count;
       badge.classList.remove('hidden');
     } else {
       badge.classList.add('hidden');
+    }
+  }
+  if (mobileBadge) {
+    if (count > 0) {
+      mobileBadge.innerText = count;
+      mobileBadge.classList.remove('hidden');
+    } else {
+      mobileBadge.classList.add('hidden');
     }
   }
 }

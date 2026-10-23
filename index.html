@@ -170,7 +170,11 @@
         </button>
         <button onclick="switchTab('denemeler')" id="tab-btn-denemeler" class="nav-tab flex items-center gap-2 px-3 py-1.5 rounded-lg font-medium transition text-white/80 hover:text-white hover:bg-white/10">
           <i class="fa-solid fa-trophy text-amber-300"></i>
-          <span>Denemeler & Sınavlar</span>
+          <span>Jumbo Matematik Denemesi</span>
+        </button>
+        <button onclick="switchTab('genel-denemeler')" id="tab-btn-genel-denemeler" class="nav-tab flex items-center gap-2 px-3 py-1.5 rounded-lg font-medium transition text-white/80 hover:text-white hover:bg-white/10">
+          <i class="fa-solid fa-graduation-cap text-indigo-300"></i>
+          <span>Genel Deneme & Analiz</span>
         </button>
         <button onclick="switchTab('books')" id="tab-btn-books" class="nav-tab flex items-center gap-2 px-3 py-1.5 rounded-lg font-medium transition text-white/80 hover:text-white hover:bg-white/10">
           <i class="fa-solid fa-book-open-reader text-emerald-300"></i>
@@ -278,11 +282,6 @@
                 <button type="button" onclick="openUploadQuestionModal()" title="Yapamadığın sorunun fotoğrafını çekip Google Drive'a yükle" class="bg-rose-50 hover:bg-rose-100 active:scale-95 text-rose-700 border border-rose-200 font-bold text-xs px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 touch-manipulation cursor-pointer">
                   <i class="fa-solid fa-camera text-sm pointer-events-none text-rose-600"></i>
                   <span>Soru Yükle</span>
-                </button>
-                <!-- General Trial Exam Button -->
-                <button type="button" onclick="openGeneralTrialModal()" title="Okulda veya dershanede girdiğin genel deneme sınavı sonucunu gir" class="bg-indigo-50 hover:bg-indigo-100 active:scale-95 text-indigo-700 border border-indigo-200 font-bold text-xs px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 touch-manipulation cursor-pointer">
-                  <i class="fa-solid fa-graduation-cap text-sm pointer-events-none text-indigo-600"></i>
-                  <span>Genel Deneme Gir</span>
                 </button>
                 <span id="dailyWorkloadBadge" class="text-xs bg-slate-100 text-slate-600 font-semibold px-2.5 py-1 rounded-full hidden sm:inline">Dengeli Dağılım</span>
               </div>
@@ -459,26 +458,7 @@
     <!-- TAB 3: 6 JUMBO DENEMELER (DENEME MODÜLÜ)   -->
     <!-- ========================================== -->
     <section id="view-denemeler" class="tab-view hidden space-y-6">
-      
-      <!-- Deneme Modülü Alt Sekme Seçici: Jumbo vs Genel Denemeler -->
-      <div class="flex items-center justify-center p-1.5 bg-slate-200/90 rounded-2xl max-w-xl mx-auto shadow-sm">
-        <button type="button" id="subtab-btn-jumbo" onclick="switchDenemeSubTab('jumbo')" class="flex-1 py-2.5 px-3 sm:px-5 rounded-xl text-xs sm:text-sm font-bold transition flex items-center justify-center gap-2 bg-white text-slate-900 shadow-sm cursor-pointer touch-manipulation">
-          <i class="fa-solid fa-trophy text-amber-500"></i>
-          <span>6 Jumbo Matematik (26 Sınav)</span>
-        </button>
-        <button type="button" id="subtab-btn-general" onclick="switchDenemeSubTab('general')" class="flex-1 py-2.5 px-3 sm:px-5 rounded-xl text-xs sm:text-sm font-bold transition flex items-center justify-center gap-2 text-slate-600 hover:text-slate-900 cursor-pointer touch-manipulation">
-          <i class="fa-solid fa-graduation-cap text-indigo-600"></i>
-          <span>Okul & Dershane Genel Denemeleri</span>
-          <span id="generalTrialsCountBadge" class="hidden px-2 py-0.5 text-[10px] bg-indigo-100 text-indigo-800 rounded-full font-black">0</span>
-        </button>
-      </div>
-
-      <!-- ========================================== -->
-      <!-- ALT GÖRÜNÜM 1: 6 JUMBO MATEMATİK DENEME BANKASI -->
-      <!-- ========================================== -->
-      <div id="subview-jumbo" class="space-y-6">
-        
-        <!-- Deneme Hero Card -->
+<!-- Deneme Hero Card -->
         <div class="bg-gradient-to-r from-amber-600 via-amber-500 to-yellow-500 rounded-3xl p-6 sm:p-8 text-white shadow-lg relative overflow-hidden">
           <div class="relative z-10 max-w-2xl">
             <div class="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-2">
@@ -543,9 +523,13 @@
       <!-- ========================================== -->
       <!-- ALT GÖRÜNÜM 2: OKUL & DERSHANE GENEL DENEMELERİ (TÜM DERSLER) -->
       <!-- ========================================== -->
-      <div id="subview-general" class="space-y-6 hidden">
+    </section>
 
-        <!-- Genel Deneme Hero Card -->
+    <!-- ========================================== -->
+    <!-- TAB: OKUL & DERSHANE GENEL DENEMELERİ (TÜM DERSLER) -->
+    <!-- ========================================== -->
+    <section id="view-genel-denemeler" class="tab-view hidden space-y-6">
+<!-- Genel Deneme Hero Card -->
         <div class="bg-gradient-to-r from-indigo-700 via-indigo-600 to-purple-600 rounded-3xl p-6 sm:p-8 text-white shadow-lg relative overflow-hidden">
           <div class="relative z-10 max-w-2xl">
             <div class="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-2">
@@ -668,9 +652,6 @@
             <!-- Dynamically populated via JS -->
           </div>
         </div>
-
-      </div>
-
     </section>
 
 
@@ -1802,12 +1783,19 @@
       <i class="fa-solid fa-calendar-days text-base"></i>
       <span class="text-[9px] font-medium mt-0.5">Takvim</span>
     </button>
-    <button onclick="switchTab('denemeler')" id="mobile-tab-btn-denemeler" class="mobile-nav-btn flex flex-col items-center justify-center flex-1 py-1.5 text-slate-500 hover:text-amber-600 transition touch-manipulation">
+    <button onclick="switchTab('denemeler')" id="mobile-tab-btn-denemeler" class="mobile-nav-btn flex flex-col items-center justify-center flex-1 py-1 text-slate-500 hover:text-amber-600 transition touch-manipulation">
       <div class="relative">
         <i class="fa-solid fa-trophy text-base"></i>
         <span class="absolute -top-1 -right-2 bg-amber-500 text-white text-[7px] font-black px-1 rounded-full">26</span>
       </div>
-      <span class="text-[9px] font-medium mt-0.5">Deneme</span>
+      <span class="text-[7.5px] font-bold mt-0.5 leading-tight text-center">Jumbo Mat</span>
+    </button>
+    <button onclick="switchTab('genel-denemeler')" id="mobile-tab-btn-genel-denemeler" class="mobile-nav-btn flex flex-col items-center justify-center flex-1 py-1 text-slate-500 hover:text-indigo-600 transition touch-manipulation">
+      <div class="relative">
+        <i class="fa-solid fa-graduation-cap text-base"></i>
+        <span id="mobileBadgeGenelDenemeCount" class="hidden absolute -top-1 -right-2 bg-indigo-600 text-white text-[7px] font-black px-1 rounded-full">0</span>
+      </div>
+      <span class="text-[7.5px] font-bold mt-0.5 leading-tight text-center">Genel Deneme</span>
     </button>
     <button onclick="switchTab('questions')" id="mobile-tab-btn-questions" class="mobile-nav-btn flex flex-col items-center justify-center flex-1 py-1.5 text-slate-500 hover:text-rose-600 transition touch-manipulation">
       <div class="relative">
@@ -1837,7 +1825,7 @@
   <audio id="successAudio" preload="auto" src="https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3"></audio>
 
   <!-- Load Data and Main Script -->
-  <script src="data.js?v=20261023_genel2"></script>
-  <script src="app.js?v=20261023_genel2"></script>
+  <script src="data.js?v=20261023_genel3"></script>
+  <script src="app.js?v=20261023_genel3"></script>
 </body>
 </html>
