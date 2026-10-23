@@ -573,6 +573,63 @@
           </div>
         </div>
 
+        <!-- 6 TEMEL DERS GÜÇ RADARI & DENGE ANALİZİ -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 sm:p-6 space-y-5">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center text-sm shadow-sm">
+                  <i class="fa-solid fa-spider"></i>
+                </span>
+                <div>
+                  <h3 class="font-bold text-slate-900 font-['Outfit'] text-lg flex items-center gap-2">
+                    6 Temel Ders Güç Radarı
+                    <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">Radar & Denge</span>
+                  </h3>
+                  <p class="text-xs text-slate-500">6 dersin genel güç profili, güçlü kaleler ve gelişim eksenleri</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Radar Modu Seçici (Ortalama / Son Sınav / Karşılaştırma) -->
+            <div class="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-bold self-start md:self-auto">
+              <button type="button" onclick="setPowerRadarMode('avg')" id="radarBtnAvg" class="px-3 py-1.5 rounded-lg transition touch-manipulation cursor-pointer bg-white text-indigo-700 shadow-xs">
+                <i class="fa-solid fa-chart-pie text-[11px] mr-1"></i>Genel Ortalama
+              </button>
+              <button type="button" onclick="setPowerRadarMode('last')" id="radarBtnLast" class="px-3 py-1.5 rounded-lg transition touch-manipulation cursor-pointer text-slate-600 hover:text-slate-900">
+                <i class="fa-solid fa-bullseye text-[11px] mr-1"></i>Son Sınav
+              </button>
+              <button type="button" onclick="setPowerRadarMode('compare')" id="radarBtnCompare" class="px-3 py-1.5 rounded-lg transition touch-manipulation cursor-pointer text-slate-600 hover:text-slate-900">
+                <i class="fa-solid fa-code-compare text-[11px] mr-1"></i>Karşılaştır
+              </button>
+            </div>
+          </div>
+
+          <!-- Radar Canvas Container -->
+          <div class="relative w-full flex flex-col items-center justify-center py-2">
+            <div class="w-full max-w-[480px] aspect-square relative">
+              <canvas id="generalPowerRadarChart" class="w-full h-full block"></canvas>
+            </div>
+
+            <!-- Karşılaştırma Modu Açıklama Lejantı -->
+            <div id="radarCompareLegend" class="hidden mt-3 flex items-center gap-4 text-xs font-semibold bg-slate-50 border border-slate-200 px-3.5 py-1.5 rounded-xl">
+              <span class="inline-flex items-center gap-1.5 text-sky-700 font-bold">
+                <span class="w-3 h-3 rounded-full bg-sky-500 shadow-xs"></span>
+                Genel Ortalama
+              </span>
+              <span class="inline-flex items-center gap-1.5 text-amber-700 font-bold">
+                <span class="w-3 h-3 rounded-full bg-amber-500 shadow-xs"></span>
+                Son Sınav Performansı
+              </span>
+            </div>
+          </div>
+
+          <!-- Radar Altı 3 Stratejik Güç & Denge Kartı -->
+          <div id="radarHighlightCards" class="grid grid-cols-1 sm:grid-cols-3 gap-3 border-t border-slate-100 pt-4">
+            <!-- Dynamically populated via JS: En Güçlü Kale, Öncelikli Eksen, Güç Dengesi Skoru -->
+          </div>
+        </div>
+
         <!-- DERS BAZINDA BAŞARI VE ORTALAMA ÖZET KARTLARI -->
         <div class="space-y-3">
           <div class="flex items-center justify-between">
@@ -586,6 +643,29 @@
           </div>
           
           <div id="generalSubjectSummaryGrid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <!-- Dynamically populated via JS -->
+          </div>
+        </div>
+
+        <!-- HER BİR DERSİN AYRINTILI ANALİZİ VE TEŞHİSİ -->
+        <div class="space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 class="font-bold text-slate-900 font-['Outfit'] text-lg flex items-center gap-2">
+                <i class="fa-solid fa-microscope text-indigo-600"></i>
+                Her Bir Dersin Ayrıntılı Analizi & Teşhisi
+              </h3>
+              <p class="text-xs text-slate-500">Doğruluk oranı, yanlışlardan kaybedilen netler ve 6. sınıf pedagojik eylem planı</p>
+            </div>
+
+            <!-- Ders Seçim Filtresi -->
+            <div id="generalSubjectDetailFilterBar" class="flex flex-wrap items-center gap-1.5 text-xs">
+              <!-- Dynamically populated via JS -->
+            </div>
+          </div>
+
+          <!-- Detaylı Ders Kartları Konteyneri -->
+          <div id="generalSubjectDetailedCardsContainer" class="space-y-4">
             <!-- Dynamically populated via JS -->
           </div>
         </div>
@@ -1825,7 +1905,7 @@
   <audio id="successAudio" preload="auto" src="https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3"></audio>
 
   <!-- Load Data and Main Script -->
-  <script src="data.js?v=20261023_genel3"></script>
-  <script src="app.js?v=20261023_genel3"></script>
+  <script src="data.js?v=20261023_genel4"></script>
+  <script src="app.js?v=20261023_genel4"></script>
 </body>
 </html>

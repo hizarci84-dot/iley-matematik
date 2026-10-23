@@ -33,6 +33,8 @@ let appState = {
   generalTrials: [], // [ { id, name, date, location, rule, subjects: [], totalQuestions, totalCorrect, totalWrong, totalEmpty, totalNet, scorePct, rankSchool, rankClass, scorePoints, notes, photoUrl, createdAt } ]
   activeDenemeSubTab: 'jumbo', // 'jumbo' | 'general'
   generalChartFilter: 'all',   // 'all' | 'tr' | 'mat' | 'fen' | 'sos' | 'din' | 'ing' | 'pct'
+  powerRadarMode: 'avg',       // 'avg' | 'last' | 'compare'
+  selectedSubjectDetail: 'all', // 'all' | 'tr' | 'mat' | 'fen' | 'sos' | 'din' | 'ing'
   editingGeneralTrialId: null,
   tempTrialSubjects: [],
   // Timer State
@@ -79,6 +81,7 @@ document.addEventListener('DOMContentLoaded', () => {
       renderDenemelerView();
     } else if (appState.activeTab === 'genel-denemeler') {
       renderGeneralTrialsChart();
+      renderGeneralPowerRadarChart();
     }
   });
 });
@@ -1107,6 +1110,52 @@ function updateGeneralTrialsCountBadge() {
   }
 }
 
+// 6. Sınıf MEB Müfredatına Uygun Ders Bazlı Pedagojik Teşhis ve Rehberlik Tanımları
+const GENERAL_SUBJECT_PEDAGOGY = {
+  tr: {
+    emoji: '🇹🇷',
+    curriculumTitle: '6. Sınıf Türkçe & Paragraf Kazanımları',
+    strengths: 'Paragrafta ana düşünce, yardımcı fikirler, deyimler ve atasözleri konularında okuduğunu anlama seviyesi yüksek.',
+    risks: 'Görsel yorumlama, infografik okuma ve sözel mantık muhakeme sorularında acele etmekten kaynaklı şık hataları.',
+    actionPlan: 'Haftada en az 2 sözel mantık testi çözülmeli; altı çizili veya olumsuz soru köklerine ("değinilmemiştir") odaklanılmalı.'
+  },
+  mat: {
+    emoji: '📐',
+    curriculumTitle: '6. Sınıf MEB Beceri Temelli Matematik',
+    strengths: 'Doğal sayılarla dört işlem, işlem önceliği, çarpanlar ve katlar, temel cebirsel kavrayış mantığı güçlü.',
+    risks: 'Uzun yeni nesil sorularda problem aşamalarını adım adım yazmadan zihinden yapmaya çalışmak ve işlem dikkatsizliği.',
+    actionPlan: 'Jumbo hafta sonu denemeleri haricinde haftalık 20 yeni nesil problem çözülmeli; yanlış sorular soru havuzuna eklenip öğretmenle birebir analiz edilmeli.'
+  },
+  fen: {
+    emoji: '🔬',
+    curriculumTitle: '6. Sınıf Fen Bilimleri & Deney Tasarımı',
+    strengths: 'Güneş Sistemi, Gezegenler, Tutulmalar, Vücudumuzdaki Sistemler kavramsal temellerinde bilgi seviyesi oturmuş.',
+    risks: 'Deney ve hipotez düzenekli sorularda bağımsız değişken, bağımlı değişken ve sabit tutulan kontrol değişkenlerini karıştırma ihtimali.',
+    actionPlan: 'Deneyli sorularda önce değişken tablosu zihinde kurulmalı, soru öncülü okunurken "Deneyin amacı nedir?" sorusuyla yaklaşılmalı.'
+  },
+  sos: {
+    emoji: '🌍',
+    curriculumTitle: '6. Sınıf Sosyal Bilgiler & Çıkarım Becerisi',
+    strengths: 'İlk Türk devletleri, İslamiyet ve Türkler, coğrafi konum ve kültürel miras konularında kronolojik kavrayış iyi.',
+    risks: 'Öncüllü sorularda ("Yalnızca bu bilgiye göre...", "Ulaşılamaz") metin dışındaki genel bilgiyi katarak aşırı yorum yapma.',
+    actionPlan: 'Metne dayalı sorularda sadece verilen paragrafa bağlı kalarak şık eleme tekniği uygulanmalı; harita ve lejant okuma pekiştirilmeli.'
+  },
+  din: {
+    emoji: '🕌',
+    curriculumTitle: '6. Sınıf Din Kültürü & Ahlak Bilgisi',
+    strengths: 'Peygamber ve ilahi kitap inancı, temel ibadetler ve İslamın ahlaki ilkeleri kavramlarında kavrayış sağlam.',
+    risks: 'Ayet ve hadis meallerinden çıkarım yaparken sorunun ana vurgusunu kaçırıp benzer genel yargılara yönelme.',
+    actionPlan: 'Ayet ve hadis sorularında ana tema kelimesi yuvarlak içine alınmalı, soru kökündeki "asıl vurgulanan" ifadesine dikkat edilmeli.'
+  },
+  ing: {
+    emoji: '🇬🇧',
+    curriculumTitle: '6. Sınıf İngilizce & İletişimsel Beceriler',
+    strengths: 'Life, Yummy Breakfast, Downtown üniteleri kelime dağarcığı ve temel günlük diyalog kalıplarında başarı yüksek.',
+    risks: 'Karşılıklı diyalog tamamlama, davet / reddetme ve görsel eşleştirme sorularında olumsuz yardımcı fiillere (doesn\'t, can\'t) dikkat eksikliği.',
+    actionPlan: 'Haftalık ünite kelime kartı tekrarları yapılmalı; soru kökündeki zaman ifadeleri ve olumsuzluk ekleri kontrol edilerek işaretlenmeli.'
+  }
+};
+
 // Ders ders genel istatistikleri hesapla
 function calculateGeneralSubjectStats() {
   const trials = appState.generalTrials || [];
@@ -1166,7 +1215,15 @@ function calculateGeneralSubjectStats() {
       entry.totalE += (parseInt(s.empty) || 0);
       const netVal = parseFloat(s.net) || 0;
       entry.totalNet += netVal;
-      entry.history.push({ trialName: t.name, date: t.date, net: netVal, q: s.questions });
+      entry.history.push({ 
+        trialName: t.name, 
+        date: t.date, 
+        net: netVal, 
+        q: parseInt(s.questions) || 0,
+        correct: parseInt(s.correct) || 0,
+        wrong: parseInt(s.wrong) || 0,
+        empty: parseInt(s.empty) || 0
+      });
     });
   });
 
@@ -1177,6 +1234,9 @@ function calculateGeneralSubjectStats() {
     item.avgNet = item.count > 0 ? (item.totalNet / item.count) : 0;
     item.avgQ = item.count > 0 ? Math.round(item.totalQ / item.count) : (DEFAULT_GENERAL_SUBJECTS.find(d => d.code === code)?.defaultQ || 20);
     item.avgPct = item.totalQ > 0 ? ((item.totalNet / item.totalQ) * 100) : 0;
+    const attempted = item.totalC + item.totalW;
+    item.accuracy = attempted > 0 ? ((item.totalC / attempted) * 100) : 0;
+    item.peakNet = item.history.length > 0 ? Math.max(...item.history.map(h => h.net)) : 0;
     
     // Trend (son sınav ile bir önceki sınav neti farkı)
     if (item.history.length >= 2) {
@@ -1212,12 +1272,608 @@ function renderGeneralTrialsView() {
   updateGeneralTrialsCountBadge();
 
   const subjectStats = calculateGeneralSubjectStats();
+  renderGeneralPowerRadarChart(subjectStats, trials);
   renderGeneralSubjectSummaryCards(subjectStats);
+  renderGeneralSubjectDetailFilterButtons();
+  renderGeneralSubjectDetailedCards(subjectStats, trials);
   renderGeneralChartFilterButtons();
   renderGeneralTrialsChart();
   renderGeneralPedagogicalAnalysis(subjectStats, trials);
   renderGeneralTrialsList();
 }
+
+// ========================================================
+// 6 TEMEL DERS GÜÇ RADARI & AKILLI DENGE ANALİZİ
+// ========================================================
+
+function setPowerRadarMode(mode) {
+  appState.powerRadarMode = mode;
+  
+  const btnAvg = document.getElementById('radarBtnAvg');
+  const btnLast = document.getElementById('radarBtnLast');
+  const btnCompare = document.getElementById('radarBtnCompare');
+  const legend = document.getElementById('radarCompareLegend');
+
+  const activeClasses = 'px-3 py-1.5 rounded-lg transition touch-manipulation cursor-pointer bg-white text-indigo-700 shadow-xs';
+  const inactiveClasses = 'px-3 py-1.5 rounded-lg transition touch-manipulation cursor-pointer text-slate-600 hover:text-slate-900';
+
+  if (btnAvg) btnAvg.className = (mode === 'avg' ? activeClasses : inactiveClasses);
+  if (btnLast) btnLast.className = (mode === 'last' ? activeClasses : inactiveClasses);
+  if (btnCompare) btnCompare.className = (mode === 'compare' ? activeClasses : inactiveClasses);
+
+  if (legend) {
+    if (mode === 'compare') legend.classList.remove('hidden');
+    else legend.classList.add('hidden');
+  }
+
+  renderGeneralPowerRadarChart();
+}
+
+function renderGeneralPowerRadarChart(subjectStats, trials) {
+  const canvas = document.getElementById('generalPowerRadarChart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+
+  if (!trials) trials = appState.generalTrials || [];
+  if (!subjectStats) subjectStats = calculateGeneralSubjectStats();
+
+  const rect = canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  const w = rect.width || 400;
+  const h = rect.height || 400;
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  ctx.scale(dpr, dpr);
+
+  ctx.clearRect(0, 0, w, h);
+
+  const mode = appState.powerRadarMode || 'avg';
+  const subjects = DEFAULT_GENERAL_SUBJECTS; // 6 primary lessons
+  const numAxes = subjects.length;
+
+  const cx = w / 2;
+  const cy = h / 2;
+  const radius = Math.min(w, h) * 0.35;
+
+  // 1. Konsantrik Altıgen Ağ Kılavuzları (20%, 40%, 60%, 80%, 100%)
+  const rings = [0.2, 0.4, 0.6, 0.8, 1.0];
+  rings.forEach((rScale, idx) => {
+    const r = radius * rScale;
+    ctx.beginPath();
+    for (let i = 0; i < numAxes; i++) {
+      const angle = -Math.PI / 2 + i * (2 * Math.PI / numAxes);
+      const x = cx + r * Math.cos(angle);
+      const y = cy + r * Math.sin(angle);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+
+    if (idx === rings.length - 1) {
+      ctx.strokeStyle = '#cbd5e1';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([]);
+      ctx.stroke();
+    } else {
+      ctx.strokeStyle = '#e2e8f0';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+      ctx.stroke();
+    }
+
+    // Yüzde etiketi
+    ctx.setLineDash([]);
+    ctx.font = 'bold 9px sans-serif';
+    ctx.fillStyle = '#94a3b8';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`${Math.round(rScale * 100)}%`, cx, cy - r + (idx === rings.length - 1 ? 10 : 0));
+  });
+
+  // 2. Merkezden Dış Eksenlere 6 Doğru Çizgi
+  for (let i = 0; i < numAxes; i++) {
+    const angle = -Math.PI / 2 + i * (2 * Math.PI / numAxes);
+    const x = cx + radius * Math.cos(angle);
+    const y = cy + radius * Math.sin(angle);
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(x, y);
+    ctx.strokeStyle = '#e2e8f0';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  // Sınav girilmemişse boş durum mesajı
+  if (trials.length === 0) {
+    ctx.fillStyle = '#64748b';
+    ctx.font = 'bold 13px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Henüz Genel Deneme Girilmedi', cx, cy - 8);
+    ctx.font = '11px sans-serif';
+    ctx.fillStyle = '#94a3b8';
+    ctx.fillText('Sınav ekledikçe 6 dersin güç radarı burada oluşacaktır.', cx, cy + 12);
+    renderRadarHighlightCards([], []);
+    return;
+  }
+
+  // 3. Verileri Hazırla: Genel Ortalama ve Son Sınav
+  const statsMap = {};
+  subjectStats.forEach(s => { statsMap[s.code] = s; });
+
+  const sortedTrials = [...trials].sort((a, b) => (a.date > b.date ? 1 : -1));
+  const latestTrial = sortedTrials[sortedTrials.length - 1];
+
+  const avgValues = subjects.map(s => {
+    const st = statsMap[s.code];
+    return st && st.avgPct !== undefined ? Math.max(0, Math.min(100, st.avgPct)) : 0;
+  });
+
+  const lastValues = subjects.map(s => {
+    if (!latestTrial || !Array.isArray(latestTrial.subjects)) return 0;
+    const match = latestTrial.subjects.find(sub => sub.code === s.code);
+    if (!match) return 0;
+    const q = parseInt(match.questions) || 0;
+    const net = parseFloat(match.net) || 0;
+    return q > 0 ? Math.max(0, Math.min(100, (net / q) * 100)) : 0;
+  });
+
+  // Çokgen Çizim Yardımcısı
+  function drawPolygon(values, fillStyle, strokeStyle, isDashed = false) {
+    const pts = [];
+    for (let i = 0; i < numAxes; i++) {
+      const angle = -Math.PI / 2 + i * (2 * Math.PI / numAxes);
+      const val = values[i];
+      const r = (val / 100) * radius;
+      const x = cx + r * Math.cos(angle);
+      const y = cy + r * Math.sin(angle);
+      pts.push({ x, y, val });
+    }
+
+    // Dolgu
+    ctx.beginPath();
+    pts.forEach((p, idx) => {
+      if (idx === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    });
+    ctx.closePath();
+    ctx.fillStyle = fillStyle;
+    ctx.fill();
+
+    // Çevre Çizgisi
+    ctx.beginPath();
+    pts.forEach((p, idx) => {
+      if (idx === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    });
+    ctx.closePath();
+    ctx.strokeStyle = strokeStyle;
+    ctx.lineWidth = 2.5;
+    if (isDashed) ctx.setLineDash([4, 4]);
+    else ctx.setLineDash([]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Köşe Noktaları
+    pts.forEach(p => {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+      ctx.strokeStyle = strokeStyle;
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+    });
+
+    return pts;
+  }
+
+  // 4. Seçilen Moda Göre Çokgenleri Çiz
+  if (mode === 'avg') {
+    drawPolygon(avgValues, 'rgba(99, 102, 241, 0.22)', '#6366f1');
+  } else if (mode === 'last') {
+    drawPolygon(lastValues, 'rgba(245, 158, 11, 0.22)', '#d97706');
+  } else if (mode === 'compare') {
+    drawPolygon(avgValues, 'rgba(14, 165, 233, 0.18)', '#0284c7', true);
+    drawPolygon(lastValues, 'rgba(245, 158, 11, 0.22)', '#d97706', false);
+  }
+
+  // 5. Dış Eksen Etiketleri (Ders Adı, Emojisi ve Değerleri)
+  for (let i = 0; i < numAxes; i++) {
+    const angle = -Math.PI / 2 + i * (2 * Math.PI / numAxes);
+    const sub = subjects[i];
+    const avgVal = avgValues[i];
+    const lastVal = lastValues[i];
+
+    const labelDist = radius + 22;
+    const lx = cx + labelDist * Math.cos(angle);
+    const ly = cy + labelDist * Math.sin(angle);
+
+    const cosVal = Math.cos(angle);
+    const sinVal = Math.sin(angle);
+
+    let align = 'center';
+    if (cosVal > 0.3) align = 'left';
+    else if (cosVal < -0.3) align = 'right';
+
+    ctx.textAlign = align;
+    ctx.textBaseline = 'middle';
+
+    ctx.font = 'bold 11px sans-serif';
+    ctx.fillStyle = '#1e293b';
+    const ped = GENERAL_SUBJECT_PEDAGOGY[sub.code];
+    const emoji = ped ? ped.emoji : '📚';
+    const line1 = `${emoji} ${sub.name}`;
+
+    let line2 = '';
+    if (mode === 'avg') {
+      line2 = `%${Math.round(avgVal)}`;
+    } else if (mode === 'last') {
+      line2 = `%${Math.round(lastVal)}`;
+    } else {
+      line2 = `Ort: %${Math.round(avgVal)} | Son: %${Math.round(lastVal)}`;
+    }
+
+    const yOff = sinVal < -0.3 ? -8 : (sinVal > 0.3 ? 8 : 0);
+    ctx.fillText(line1, lx, ly + yOff - 6);
+
+    ctx.font = 'bold 10px sans-serif';
+    ctx.fillStyle = sub.strokeCol || '#6366f1';
+    ctx.fillText(line2, lx, ly + yOff + 8);
+  }
+
+  // 6. Radar Altı 3 Stratejik Kartı Çiz
+  renderRadarHighlightCards(subjectStats, avgValues);
+}
+
+function renderRadarHighlightCards(subjectStats, avgValues) {
+  const container = document.getElementById('radarHighlightCards');
+  if (!container) return;
+  container.innerHTML = '';
+
+  if (!subjectStats || subjectStats.length === 0 || subjectStats.every(s => s.count === 0)) {
+    container.innerHTML = `
+      <div class="bg-slate-50 rounded-xl p-3 border border-slate-200 text-center text-xs text-slate-500 col-span-1 sm:col-span-3">
+        Genel deneme sınavı girdikçe güç dengesi ve en güçlü ders analiziniz burada belirecektir.
+      </div>
+    `;
+    return;
+  }
+
+  const active = subjectStats.filter(s => s.count > 0).sort((a, b) => b.avgPct - a.avgPct);
+  if (active.length === 0) return;
+
+  const strongest = active[0];
+  const lowest = active[active.length - 1];
+
+  // Denge Skoru (Ortalamadan Sapma Hesaplaması)
+  const validPcts = active.map(s => s.avgPct);
+  const mean = validPcts.reduce((sum, v) => sum + v, 0) / validPcts.length;
+  const mad = validPcts.reduce((sum, v) => sum + Math.abs(v - mean), 0) / validPcts.length;
+  const balanceScore = Math.max(0, Math.min(100, Math.round(100 - mad * 1.6)));
+
+  let balanceLabel = 'Dengeli Güç Dağılımı';
+  let balanceIcon = 'fa-scale-balanced';
+  let balanceDesc = '6 ders birbirine yakın başarıda; genel akademik güç homojen ilerliyor.';
+
+  if (balanceScore < 65) {
+    balanceLabel = 'Geliştirilecek Eksenler Var';
+    balanceIcon = 'fa-triangle-exclamation';
+    balanceDesc = 'Dersler arası başarı farkı belirgin; öncelikli telafi derslerine ağırlık verilmeli.';
+  } else if (balanceScore < 80) {
+    balanceLabel = 'İyi Seviye Denge';
+    balanceIcon = 'fa-circle-half-stroke';
+    balanceDesc = 'Temel dersler önde ilerlerken bazı derslerde hızlı toparlanma potansiyeli mevcut.';
+  }
+
+  container.innerHTML = `
+    <!-- Kart 1: En Güçlü Kale -->
+    <div class="bg-gradient-to-br from-emerald-50/70 to-white rounded-xl p-3.5 border border-emerald-200 shadow-xs flex flex-col justify-between">
+      <div>
+        <div class="flex items-center justify-between text-xs font-bold text-emerald-800 mb-1">
+          <span class="flex items-center gap-1.5"><i class="fa-solid fa-shield-halved text-emerald-600"></i> En Güçlü Kale</span>
+          <span class="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded-full font-black">%${strongest.avgPct.toFixed(0)} Başarı</span>
+        </div>
+        <h4 class="font-black text-slate-900 text-sm mt-1">${strongest.name}</h4>
+        <p class="text-[11px] text-slate-600 mt-1 leading-relaxed">
+          Ortalama <strong>${strongest.avgNet.toFixed(1)} net</strong> ile en yüksek net katkısı sağlayan ve öğrencinin en güvendiği ders.
+        </p>
+      </div>
+      <div class="mt-2 pt-2 border-t border-emerald-100 text-[10px] text-emerald-700 font-semibold flex items-center gap-1">
+        <i class="fa-solid fa-trophy"></i> İstikrarla korunması önerilir
+      </div>
+    </div>
+
+    <!-- Kart 2: Öncelikli Gelişim Ekseni -->
+    <div class="bg-gradient-to-br from-amber-50/70 to-white rounded-xl p-3.5 border border-amber-200 shadow-xs flex flex-col justify-between">
+      <div>
+        <div class="flex items-center justify-between text-xs font-bold text-amber-800 mb-1">
+          <span class="flex items-center gap-1.5"><i class="fa-solid fa-bullseye text-amber-600"></i> Gelişim Ekseni</span>
+          <span class="bg-amber-100 text-amber-800 text-[10px] px-2 py-0.5 rounded-full font-black">%${lowest.avgPct.toFixed(0)} Başarı</span>
+        </div>
+        <h4 class="font-black text-slate-900 text-sm mt-1">${lowest.name}</h4>
+        <p class="text-[11px] text-slate-600 mt-1 leading-relaxed">
+          Ortalama <strong>${lowest.avgNet.toFixed(1)} net</strong>. Genel puanı yukarı taşıyacak en yüksek net artış fırsatı bu derste.
+        </p>
+      </div>
+      <div class="mt-2 pt-2 border-t border-amber-100 text-[10px] text-amber-800 font-semibold flex items-center gap-1">
+        <i class="fa-solid fa-arrow-trend-up"></i> Yanlış soru analizine öncelik verilmeli
+      </div>
+    </div>
+
+    <!-- Kart 3: Genel Güç Dengesi Skoru -->
+    <div class="bg-gradient-to-br from-indigo-50/70 to-white rounded-xl p-3.5 border border-indigo-200 shadow-xs flex flex-col justify-between">
+      <div>
+        <div class="flex items-center justify-between text-xs font-bold text-indigo-800 mb-1">
+          <span class="flex items-center gap-1.5"><i class="fa-solid ${balanceIcon} text-indigo-600"></i> Güç Dengesi</span>
+          <span class="bg-indigo-100 text-indigo-800 text-[10px] px-2 py-0.5 rounded-full font-black">${balanceScore} / 100</span>
+        </div>
+        <h4 class="font-black text-slate-900 text-sm mt-1">${balanceLabel}</h4>
+        <p class="text-[11px] text-slate-600 mt-1 leading-relaxed">
+          ${balanceDesc}
+        </p>
+      </div>
+      <div class="mt-2 pt-2 border-t border-indigo-100 text-[10px] text-indigo-700 font-semibold flex items-center gap-1">
+        <i class="fa-solid fa-chart-pie"></i> 6 dersin homojen dağılımı
+      </div>
+    </div>
+  `;
+}
+
+// ========================================================
+// HER BİR DERSİN AYRINTILI ANALİZİ VE TEŞHİSİ
+// ========================================================
+
+function renderGeneralSubjectDetailFilterButtons() {
+  const bar = document.getElementById('generalSubjectDetailFilterBar');
+  if (!bar) return;
+  bar.innerHTML = '';
+
+  const activeFilter = appState.selectedSubjectDetail || 'all';
+
+  const filterOptions = [
+    { code: 'all', label: 'Tüm Dersler (6)' },
+    ...DEFAULT_GENERAL_SUBJECTS.map(s => {
+      const ped = GENERAL_SUBJECT_PEDAGOGY[s.code];
+      return {
+        code: s.code,
+        label: `${ped ? ped.emoji : ''} ${s.name}`
+      };
+    })
+  ];
+
+  filterOptions.forEach(opt => {
+    const isActive = activeFilter === opt.code;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.onclick = () => setSubjectDetailFilter(opt.code);
+    btn.className = `px-3 py-1.5 rounded-xl font-bold transition cursor-pointer touch-manipulation text-xs flex items-center gap-1.5 ${
+      isActive
+        ? 'bg-indigo-600 text-white shadow-sm ring-2 ring-indigo-300'
+        : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
+    }`;
+    btn.innerHTML = `<span>${opt.label}</span>`;
+    bar.appendChild(btn);
+  });
+}
+
+function setSubjectDetailFilter(subCode) {
+  appState.selectedSubjectDetail = subCode;
+  renderGeneralSubjectDetailFilterButtons();
+  renderGeneralSubjectDetailedCards();
+}
+
+function renderGeneralSubjectDetailedCards(subjectStats, trials) {
+  const container = document.getElementById('generalSubjectDetailedCardsContainer');
+  if (!container) return;
+  container.innerHTML = '';
+
+  if (!subjectStats) subjectStats = calculateGeneralSubjectStats();
+  if (!trials) trials = appState.generalTrials || [];
+
+  if (trials.length === 0) {
+    container.innerHTML = `
+      <div class="bg-white rounded-2xl p-8 border border-slate-200 text-center space-y-2">
+        <i class="fa-solid fa-microscope text-3xl text-indigo-400"></i>
+        <h4 class="text-sm font-bold text-slate-800">Henüz Deneme Analizi Bulunmuyor</h4>
+        <p class="text-xs text-slate-500">Okul veya dershane denemesi eklediğinizde her dersin MEB kazanım analizi, doğruluk oranı ve telafi planı burada listelenecektir.</p>
+      </div>
+    `;
+    return;
+  }
+
+  const selectedFilter = appState.selectedSubjectDetail || 'all';
+  const subjectsToRender = selectedFilter === 'all' 
+    ? subjectStats 
+    : subjectStats.filter(s => s.code === selectedFilter);
+
+  subjectsToRender.forEach(stat => {
+    const ped = GENERAL_SUBJECT_PEDAGOGY[stat.code] || {
+      emoji: '📚',
+      curriculumTitle: '6. Sınıf Genel Kazanım',
+      strengths: 'Ders temellerinde kavram bilgisi mevcut.',
+      risks: 'Soru köklerini dikkatli okuma ve işlem kontrolü.',
+      actionPlan: 'Düzenli tekrar ve hatalı soruların çözümü.'
+    };
+
+    // Başarı Rozeti
+    let masteryBadge = {
+      label: '💎 Elit / Usta Seviye',
+      badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-300'
+    };
+    if (stat.avgPct < 50) {
+      masteryBadge = { label: '🔴 Öncelikli Telafi Gereken', badgeClass: 'bg-rose-100 text-rose-800 border-rose-300' };
+    } else if (stat.avgPct < 70) {
+      masteryBadge = { label: '🟡 Orta Düzey', badgeClass: 'bg-amber-100 text-amber-800 border-amber-300' };
+    } else if (stat.avgPct < 85) {
+      masteryBadge = { label: '🟢 İleri Düzey', badgeClass: 'bg-blue-100 text-blue-800 border-blue-300' };
+    }
+
+    // Trend Rozeti
+    let trendBadge = '';
+    if (stat.count >= 2) {
+      if (stat.trend > 0) {
+        trendBadge = `<span class="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-xl flex items-center gap-1"><i class="fa-solid fa-arrow-trend-up"></i> +${stat.trend.toFixed(1)} Son Sınav Artışı</span>`;
+      } else if (stat.trend < 0) {
+        trendBadge = `<span class="text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-xl flex items-center gap-1"><i class="fa-solid fa-arrow-trend-down"></i> ${stat.trend.toFixed(1)} Son Sınav Azalışı</span>`;
+      } else {
+        trendBadge = `<span class="text-xs font-bold text-slate-600 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-xl flex items-center gap-1">➡️ Stabil</span>`;
+      }
+    }
+
+    // Doğruluk Oranı D / (D + Y)
+    const attempted = stat.totalC + stat.totalW;
+    const accuracy = attempted > 0 ? ((stat.totalC / attempted) * 100) : 0;
+
+    // Rekor Net
+    const peakNet = stat.history && stat.history.length > 0 ? Math.max(...stat.history.map(h => h.net)) : 0;
+
+    // Yanlışlardan Kaybedilen Net
+    const lostNet = (stat.totalW / 3).toFixed(2);
+
+    // İlerleme Çubuğu Oranları
+    const totalQAll = stat.totalQ || 1;
+    const pctC = Math.round((stat.totalC / totalQAll) * 100);
+    const pctW = Math.round((stat.totalW / totalQAll) * 100);
+    const pctE = Math.max(0, 100 - pctC - pctW);
+
+    // Sınav Geçmişi Hapları
+    const historyPills = (stat.history || []).map((h, idx) => `
+      <span class="inline-flex items-center gap-1 text-[11px] bg-slate-100 border border-slate-200 rounded-lg px-2 py-0.5 font-medium text-slate-700">
+        <span class="font-bold text-slate-900">${h.trialName || `D${idx+1}`}:</span>
+        <span class="font-mono font-bold" style="color: ${stat.strokeCol}">${h.net.toFixed(2)} Net</span>
+      </span>
+    `).join('');
+
+    const card = document.createElement('div');
+    card.className = `bg-white rounded-2xl p-5 border ${stat.borderCol || 'border-slate-200'} shadow-sm space-y-4 hover:shadow-md transition`;
+    card.innerHTML = `
+      <!-- Kart Başlığı & Rozetler -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+        <div class="flex items-center gap-3">
+          <div class="w-12 h-12 rounded-2xl ${stat.bgLight} ${stat.textCol} flex items-center justify-center text-xl shadow-xs flex-shrink-0">
+            <i class="fa-solid ${stat.icon}"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h4 class="text-base font-black text-slate-900">${ped.emoji} ${stat.name}</h4>
+              <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${masteryBadge.badgeClass}">
+                ${masteryBadge.label}
+              </span>
+            </div>
+            <p class="text-xs text-slate-500 mt-0.5">${ped.curriculumTitle} • Toplam ${stat.count} Sınav Girişi</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 self-start sm:self-auto">
+          ${trendBadge}
+        </div>
+      </div>
+
+      <!-- 4 Temel Metrik Göstergesi -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+        <div class="bg-slate-50 rounded-xl p-3 border border-slate-100">
+          <span class="block text-[10px] text-slate-500 uppercase font-semibold">Ortalama Net</span>
+          <div class="flex items-baseline gap-1 mt-0.5">
+            <span class="text-xl font-black ${stat.textCol}">${stat.avgNet.toFixed(2)}</span>
+            <span class="text-xs text-slate-400 font-semibold">/ ${stat.avgQ}</span>
+          </div>
+        </div>
+
+        <div class="bg-slate-50 rounded-xl p-3 border border-slate-100">
+          <span class="block text-[10px] text-slate-500 uppercase font-semibold">Net Başarı %</span>
+          <div class="flex items-baseline gap-1 mt-0.5">
+            <span class="text-xl font-black text-slate-900">%${stat.avgPct.toFixed(1)}</span>
+          </div>
+        </div>
+
+        <div class="bg-slate-50 rounded-xl p-3 border border-slate-100">
+          <span class="block text-[10px] text-slate-500 uppercase font-semibold">İşaretleme Doğruluğu</span>
+          <div class="flex items-baseline gap-1 mt-0.5">
+            <span class="text-xl font-black ${accuracy >= 80 ? 'text-emerald-600' : 'text-amber-600'}">%${accuracy.toFixed(1)}</span>
+            <span class="text-[10px] text-slate-400 font-normal">D/(D+Y)</span>
+          </div>
+        </div>
+
+        <div class="bg-slate-50 rounded-xl p-3 border border-slate-100">
+          <span class="block text-[10px] text-slate-500 uppercase font-semibold">Zirve Net (Rekor)</span>
+          <div class="flex items-baseline gap-1 mt-0.5">
+            <span class="text-xl font-black text-indigo-600">${peakNet.toFixed(2)}</span>
+            <span class="text-xs text-slate-400 font-semibold">Net</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Soru Dağılımı ve Yanlış Ceza Analizi -->
+      <div class="bg-slate-50/80 rounded-xl p-3.5 border border-slate-200/60 space-y-2.5">
+        <div class="flex items-center justify-between text-xs">
+          <span class="font-bold text-slate-700 flex items-center gap-1.5">
+            <i class="fa-solid fa-chart-bar text-indigo-500"></i> Toplam Soru Dağılımı
+          </span>
+          <span class="text-slate-500 text-[11px] font-medium">
+            <strong class="text-emerald-700">${stat.totalC} Doğru</strong> • 
+            <strong class="text-rose-700">${stat.totalW} Yanlış</strong> • 
+            <strong class="text-amber-700">${stat.totalE} Boş</strong>
+          </span>
+        </div>
+
+        <!-- Segmented Progress Bar -->
+        <div class="w-full h-3 rounded-full overflow-hidden flex bg-slate-200 shadow-inner">
+          <div style="width: ${pctC}%" class="bg-emerald-500 h-full transition-all duration-500" title="Doğru: %${pctC}"></div>
+          <div style="width: ${pctW}%" class="bg-rose-500 h-full transition-all duration-500" title="Yanlış: %${pctW}"></div>
+          <div style="width: ${pctE}%" class="bg-amber-300 h-full transition-all duration-500" title="Boş: %${pctE}"></div>
+        </div>
+
+        <!-- Yanlışlardan Kaybedilen Net Uyarısı -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between text-[11px] text-slate-600 pt-1 gap-1">
+          <span class="flex items-center gap-1 text-rose-700 font-semibold">
+            <i class="fa-solid fa-circle-minus"></i>
+            3 Yanlış 1 Doğru Kaybı: <strong>-${lostNet} Net</strong>
+          </span>
+          <span class="text-slate-500">
+            Yanlışlar boş bırakılsaydı ortalama net: <strong class="text-slate-800">${(stat.avgNet + (parseFloat(lostNet) / (stat.count || 1))).toFixed(2)}</strong> olacaktı.
+          </span>
+        </div>
+      </div>
+
+      <!-- 6. Sınıf Pedagojik Teşhis & Eylem Planı (3 Sütun) -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+        <!-- Güçlü Yön -->
+        <div class="bg-emerald-50/50 rounded-xl p-3 border border-emerald-100 space-y-1">
+          <div class="text-xs font-bold text-emerald-800 flex items-center gap-1.5">
+            <i class="fa-solid fa-circle-check text-emerald-600"></i> Güçlü Yön & Hakimiyet
+          </div>
+          <p class="text-[11px] text-slate-600 leading-relaxed">${ped.strengths}</p>
+        </div>
+
+        <!-- Dikkat Edilecek Nokta -->
+        <div class="bg-amber-50/50 rounded-xl p-3 border border-amber-100 space-y-1">
+          <div class="text-xs font-bold text-amber-800 flex items-center gap-1.5">
+            <i class="fa-solid fa-triangle-exclamation text-amber-600"></i> Risk & Dikkat Alanı
+          </div>
+          <p class="text-[11px] text-slate-600 leading-relaxed">${ped.risks}</p>
+        </div>
+
+        <!-- Öğretmen Eylem Planı -->
+        <div class="bg-indigo-50/50 rounded-xl p-3 border border-indigo-100 space-y-1">
+          <div class="text-xs font-bold text-indigo-800 flex items-center gap-1.5">
+            <i class="fa-solid fa-list-check text-indigo-600"></i> Öğretmen Eylem Planı
+          </div>
+          <p class="text-[11px] text-slate-600 leading-relaxed">${ped.actionPlan}</p>
+        </div>
+      </div>
+
+      <!-- Geçmiş Sınavlar Kronolojisi (Varsa) -->
+      ${stat.history && stat.history.length > 0 ? `
+        <div class="pt-2 border-t border-slate-100 flex flex-wrap items-center gap-1.5">
+          <span class="text-[10px] font-bold text-slate-400 uppercase mr-1">Sınav Geçmişi:</span>
+          ${historyPills}
+        </div>
+      ` : ''}
+    `;
+    container.appendChild(card);
+  });
+}
+
 
 // 6 Temel Ders Başarı ve Ortalama Kartlarını Çiz
 function renderGeneralSubjectSummaryCards(subjectStats) {
