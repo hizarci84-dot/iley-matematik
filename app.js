@@ -29,6 +29,13 @@ let appState = {
   xp: 0,
   streak: 0,
   lastStreakDate: null,
+  // Genel Deneme Sınavları & Ders Analiz Durumu
+  generalTrials: [], // [ { id, name, date, location, rule, subjects: [], totalQuestions, totalCorrect, totalWrong, totalEmpty, totalNet, scorePct, rankSchool, rankClass, scorePoints, notes, photoUrl, createdAt } ]
+  activeDenemeSubTab: 'jumbo', // 'jumbo' | 'general'
+  generalChartFilter: 'all',   // 'all' | 'tr' | 'mat' | 'fen' | 'sos' | 'din' | 'ing' | 'pct'
+  editingGeneralTrialId: null,
+  tempTrialPhotoBase64: null,
+  tempTrialSubjects: [],
   // Timer State
   timerMode: 'pomodoro', // 'pomodoro' (25m), 'deneme' (40m), 'stopwatch'
   timerRemaining: 25 * 60,
@@ -70,7 +77,11 @@ document.addEventListener('DOMContentLoaded', () => {
   // Responsive Canvas Chart Redraw
   window.addEventListener('resize', () => {
     if (appState.activeTab === 'denemeler') {
-      renderDenemelerView();
+      if (appState.activeDenemeSubTab === 'general') {
+        renderGeneralTrialsChart();
+      } else {
+        renderDenemelerView();
+      }
     }
   });
 });
@@ -90,6 +101,7 @@ function loadProgress() {
       appState.completedTasks = parsed.completedTasks || {};
       appState.testResults = parsed.testResults || {};
       appState.questions = parsed.questions || [];
+      appState.generalTrials = parsed.generalTrials || [];
       appState.cloudSettings = Object.assign(defaultCloud, parsed.cloudSettings || {});
       delete appState.cloudSettings.whatsappGroup;
       if (!appState.cloudSettings.teacherPin) appState.cloudSettings.teacherPin = '1984';
@@ -114,6 +126,7 @@ function saveProgress(skipCloudSync = false) {
       completedTasks: appState.completedTasks,
       testResults: appState.testResults,
       questions: appState.questions,
+      generalTrials: appState.generalTrials || [],
       cloudSettings: appState.cloudSettings,
       xp: appState.xp,
       streak: appState.streak,
@@ -156,6 +169,7 @@ function syncProgressToCloudQuietly() {
       completedTasks: appState.completedTasks,
       testResults: appState.testResults,
       questions: appState.questions || [],
+      generalTrials: appState.generalTrials || [],
       xp: appState.xp,
       streak: appState.streak,
       lastStreakDate: appState.lastStreakDate,
@@ -230,6 +244,14 @@ async function autoSyncFromCloudQuietly() {
         appState.streak = cloudData.streak;
         appState.lastStreakDate = cloudData.lastStreakDate;
         hasChanges = true;
+      }
+
+      // 5. Genel Deneme Sınavlarını Birleştir
+      if (Array.isArray(cloudData.generalTrials)) {
+        if (JSON.stringify(appState.generalTrials) !== JSON.stringify(cloudData.generalTrials)) {
+          appState.generalTrials = cloudData.generalTrials;
+          hasChanges = true;
+        }
       }
 
       if (hasChanges) {
@@ -387,7 +409,13 @@ function switchTab(tabId) {
   // Refresh tab-specific renders
   if (tabId === 'today') renderTodayView();
   else if (tabId === 'schedule') renderScheduleView();
-  else if (tabId === 'denemeler') renderDenemelerView();
+  else if (tabId === 'denemeler') {
+    if (appState.activeDenemeSubTab === 'general') {
+      renderGeneralTrialsView();
+    } else {
+      renderDenemelerView();
+    }
+  }
   else if (tabId === 'books') renderBooksView();
   else if (tabId === 'badges') renderBadgesView();
   else if (tabId === 'questions') renderQuestionsView();
@@ -434,7 +462,12 @@ function setupTouchGestures() {
 function renderAllViews() {
   renderTodayView();
   renderScheduleView();
-  renderDenemelerView();
+  if (appState.activeDenemeSubTab === 'general') {
+    renderGeneralTrialsView();
+  } else {
+    renderDenemelerView();
+  }
+  updateGeneralTrialsCountBadge();
   renderBooksView();
   renderBadgesView();
 }
@@ -1002,6 +1035,1270 @@ function renderDenemeChart(labels, data) {
       ctx.fillText(lbl, x, h - 10);
     }
   });
+}
+
+// ================================================================
+// OKUL & DERSHANE GENEL DENEMELERİ & DERS BAZLI ANALİZ MOTORU
+// ================================================================
+
+const DEFAULT_GENERAL_SUBJECTS = [
+  { code: 'tr', name: 'Türkçe', icon: 'fa-book', color: 'rose', bgLight: 'bg-rose-50', textCol: 'text-rose-700', borderCol: 'border-rose-200', strokeCol: '#f43f5e', defaultQ: 20 },
+  { code: 'mat', name: 'Matematik', icon: 'fa-square-root-variable', color: 'blue', bgLight: 'bg-blue-50', textCol: 'text-blue-700', borderCol: 'border-blue-200', strokeCol: '#3b82f6', defaultQ: 20 },
+  { code: 'fen', name: 'Fen Bilimleri', icon: 'fa-flask', color: 'purple', bgLight: 'bg-purple-50', textCol: 'text-purple-700', borderCol: 'border-purple-200', strokeCol: '#a855f7', defaultQ: 20 },
+  { code: 'sos', name: 'Sosyal Bilgiler', icon: 'fa-earth-americas', color: 'amber', bgLight: 'bg-amber-50', textCol: 'text-amber-800', borderCol: 'border-amber-200', strokeCol: '#f59e0b', defaultQ: 10 },
+  { code: 'din', name: 'Din Kültürü', icon: 'fa-mosque', color: 'emerald', bgLight: 'bg-emerald-50', textCol: 'text-emerald-700', borderCol: 'border-emerald-200', strokeCol: '#10b981', defaultQ: 10 },
+  { code: 'ing', name: 'İngilizce', icon: 'fa-language', color: 'indigo', bgLight: 'bg-indigo-50', textCol: 'text-indigo-700', borderCol: 'border-indigo-200', strokeCol: '#6366f1', defaultQ: 10 }
+];
+
+const GENERAL_TEMPLATES = {
+  '90': { tr: 20, mat: 20, fen: 20, sos: 10, din: 10, ing: 10 },
+  '75': { tr: 15, mat: 15, fen: 15, sos: 10, din: 10, ing: 10 },
+  '80': { tr: 20, mat: 20, fen: 20, sos: 10, din: 5, ing: 5 },
+  '100': { tr: 20, mat: 20, fen: 20, sos: 20, din: 10, ing: 10 }
+};
+
+let activeDetailTrial = null;
+
+// Alt sekme geçişi (Jumbo vs Genel Denemeler)
+function switchDenemeSubTab(subTab) {
+  appState.activeDenemeSubTab = subTab;
+  const jumboBtn = document.getElementById('subtab-btn-jumbo');
+  const generalBtn = document.getElementById('subtab-btn-general');
+  const jumboView = document.getElementById('subview-jumbo');
+  const generalView = document.getElementById('subview-general');
+
+  if (subTab === 'general') {
+    if (jumboBtn) {
+      jumboBtn.classList.remove('bg-white', 'text-slate-900', 'shadow-sm');
+      jumboBtn.classList.add('text-slate-600', 'hover:text-slate-900');
+    }
+    if (generalBtn) {
+      generalBtn.classList.add('bg-white', 'text-slate-900', 'shadow-sm');
+      generalBtn.classList.remove('text-slate-600', 'hover:text-slate-900');
+    }
+    if (jumboView) jumboView.classList.add('hidden');
+    if (generalView) generalView.classList.remove('hidden');
+    renderGeneralTrialsView();
+  } else {
+    if (generalBtn) {
+      generalBtn.classList.remove('bg-white', 'text-slate-900', 'shadow-sm');
+      generalBtn.classList.add('text-slate-600', 'hover:text-slate-900');
+    }
+    if (jumboBtn) {
+      jumboBtn.classList.add('bg-white', 'text-slate-900', 'shadow-sm');
+      jumboBtn.classList.remove('text-slate-600', 'hover:text-slate-900');
+    }
+    if (generalView) generalView.classList.add('hidden');
+    if (jumboView) jumboView.classList.remove('hidden');
+    renderDenemelerView();
+  }
+}
+
+// Genel deneme rozeti sayısını güncelle
+function updateGeneralTrialsCountBadge() {
+  const count = (appState.generalTrials || []).length;
+  const badge = document.getElementById('generalTrialsCountBadge');
+  if (badge) {
+    if (count > 0) {
+      badge.innerText = count;
+      badge.classList.remove('hidden');
+    } else {
+      badge.classList.add('hidden');
+    }
+  }
+}
+
+// Ders ders genel istatistikleri hesapla
+function calculateGeneralSubjectStats() {
+  const trials = appState.generalTrials || [];
+  const map = {};
+
+  // Varsayılan dersleri hazırla
+  DEFAULT_GENERAL_SUBJECTS.forEach(s => {
+    map[s.code] = {
+      code: s.code,
+      name: s.name,
+      icon: s.icon,
+      color: s.color,
+      bgLight: s.bgLight,
+      textCol: s.textCol,
+      borderCol: s.borderCol,
+      strokeCol: s.strokeCol,
+      count: 0,
+      totalQ: 0,
+      totalC: 0,
+      totalW: 0,
+      totalE: 0,
+      totalNet: 0,
+      history: []
+    };
+  });
+
+  // Kronolojik sıralı sınavları tara
+  const sortedTrials = [...trials].sort((a, b) => (a.date > b.date ? 1 : -1));
+
+  sortedTrials.forEach(t => {
+    if (!Array.isArray(t.subjects)) return;
+    t.subjects.forEach(s => {
+      if (!map[s.code]) {
+        map[s.code] = {
+          code: s.code,
+          name: s.name || s.code,
+          icon: 'fa-book-bookmark',
+          color: 'indigo',
+          bgLight: 'bg-indigo-50',
+          textCol: 'text-indigo-700',
+          borderCol: 'border-indigo-200',
+          strokeCol: '#6366f1',
+          count: 0,
+          totalQ: 0,
+          totalC: 0,
+          totalW: 0,
+          totalE: 0,
+          totalNet: 0,
+          history: []
+        };
+      }
+      const entry = map[s.code];
+      entry.count++;
+      entry.totalQ += (parseInt(s.questions) || 0);
+      entry.totalC += (parseInt(s.correct) || 0);
+      entry.totalW += (parseInt(s.wrong) || 0);
+      entry.totalE += (parseInt(s.empty) || 0);
+      const netVal = parseFloat(s.net) || 0;
+      entry.totalNet += netVal;
+      entry.history.push({ trialName: t.name, date: t.date, net: netVal, q: s.questions });
+    });
+  });
+
+  // Ortalamaları ve trendleri hesapla
+  const result = [];
+  for (const code in map) {
+    const item = map[code];
+    item.avgNet = item.count > 0 ? (item.totalNet / item.count) : 0;
+    item.avgQ = item.count > 0 ? Math.round(item.totalQ / item.count) : (DEFAULT_GENERAL_SUBJECTS.find(d => d.code === code)?.defaultQ || 20);
+    item.avgPct = item.totalQ > 0 ? ((item.totalNet / item.totalQ) * 100) : 0;
+    
+    // Trend (son sınav ile bir önceki sınav neti farkı)
+    if (item.history.length >= 2) {
+      item.trend = item.history[item.history.length - 1].net - item.history[item.history.length - 2].net;
+    } else {
+      item.trend = 0;
+    }
+    result.push(item);
+  }
+
+  return result;
+}
+
+// Genel Denemeler Görünümünü Çiz
+function renderGeneralTrialsView() {
+  const trials = appState.generalTrials || [];
+  const totalCount = trials.length;
+  const totalQuestions = trials.reduce((sum, t) => sum + (parseInt(t.totalQuestions) || 0), 0);
+  const totalNet = trials.reduce((sum, t) => sum + (parseFloat(t.totalNet) || 0), 0);
+  const avgNet = totalCount > 0 ? (totalNet / totalCount).toFixed(2) : '0.00';
+  const avgPct = totalQuestions > 0 ? ((totalNet / totalQuestions) * 100).toFixed(1) : '0';
+
+  const totalCountEl = document.getElementById('generalTotalCount');
+  const totalQEl = document.getElementById('generalTotalQuestions');
+  const avgNetEl = document.getElementById('generalAvgNet');
+  const avgPctEl = document.getElementById('generalAvgPct');
+
+  if (totalCountEl) totalCountEl.innerText = `${totalCount} Deneme`;
+  if (totalQEl) totalQEl.innerText = `${totalQuestions} Soru`;
+  if (avgNetEl) avgNetEl.innerText = avgNet;
+  if (avgPctEl) avgPctEl.innerText = `%${avgPct}`;
+
+  updateGeneralTrialsCountBadge();
+
+  const subjectStats = calculateGeneralSubjectStats();
+  renderGeneralSubjectSummaryCards(subjectStats);
+  renderGeneralChartFilterButtons();
+  renderGeneralTrialsChart();
+  renderGeneralPedagogicalAnalysis(subjectStats, trials);
+  renderGeneralTrialsList();
+}
+
+// 6 Temel Ders Başarı ve Ortalama Kartlarını Çiz
+function renderGeneralSubjectSummaryCards(subjectStats) {
+  const grid = document.getElementById('generalSubjectSummaryGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
+
+  subjectStats.forEach(stat => {
+    const card = document.createElement('div');
+    card.className = `bg-white rounded-2xl p-3.5 border ${stat.borderCol || 'border-slate-200'} shadow-sm flex flex-col justify-between hover:shadow-md transition`;
+    
+    let trendBadge = '';
+    if (stat.count >= 2) {
+      if (stat.trend > 0) {
+        trendBadge = `<span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md flex items-center gap-0.5"><i class="fa-solid fa-arrow-trend-up text-[9px]"></i>+${stat.trend.toFixed(1)}</span>`;
+      } else if (stat.trend < 0) {
+        trendBadge = `<span class="text-[10px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded-md flex items-center gap-0.5"><i class="fa-solid fa-arrow-trend-down text-[9px]"></i>${stat.trend.toFixed(1)}</span>`;
+      } else {
+        trendBadge = `<span class="text-[10px] font-bold text-slate-500 bg-slate-50 px-1.5 py-0.5 rounded-md">-</span>`;
+      }
+    }
+
+    card.innerHTML = `
+      <div>
+        <div class="flex items-center justify-between mb-2">
+          <div class="w-8 h-8 rounded-xl ${stat.bgLight} ${stat.textCol} flex items-center justify-center text-sm shadow-xs">
+            <i class="fa-solid ${stat.icon}"></i>
+          </div>
+          ${trendBadge}
+        </div>
+        <h4 class="text-xs font-bold text-slate-900 line-clamp-1">${stat.name}</h4>
+        <div class="mt-1 flex items-baseline gap-1">
+          <span class="text-lg font-black ${stat.textCol}">${stat.avgNet.toFixed(2)}</span>
+          <span class="text-[10px] text-slate-400 font-semibold">/ ${stat.avgQ} Net</span>
+        </div>
+      </div>
+
+      <div class="mt-3 pt-2.5 border-t border-slate-100 space-y-1.5">
+        <div class="flex items-center justify-between text-[10px]">
+          <span class="text-slate-500 font-medium">Başarı:</span>
+          <span class="font-black ${stat.textCol}">%${stat.avgPct.toFixed(0)}</span>
+        </div>
+        <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+          <div class="h-full rounded-full transition-all duration-500" style="width: ${Math.min(100, Math.max(0, stat.avgPct))}%; background-color: ${stat.strokeCol || '#6366f1'}"></div>
+        </div>
+        <div class="flex items-center justify-between text-[9px] text-slate-400 font-medium pt-0.5">
+          <span>${stat.totalC}D • ${stat.totalW}Y • ${stat.totalE}B</span>
+          <span>${stat.count} Sınav</span>
+        </div>
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+// Grafik Filtre Butonlarını Çiz
+function renderGeneralChartFilterButtons() {
+  const bar = document.getElementById('generalChartFilterBar');
+  if (!bar) return;
+  bar.innerHTML = '';
+
+  const filters = [
+    { key: 'all', label: '📊 Toplam Net', stroke: '#4f46e5' },
+    { key: 'tr', label: '🇹🇷 Türkçe', stroke: '#f43f5e' },
+    { key: 'mat', label: '📐 Matematik', stroke: '#3b82f6' },
+    { key: 'fen', label: '🔬 Fen', stroke: '#a855f7' },
+    { key: 'sos', label: '🌍 Sosyal', stroke: '#f59e0b' },
+    { key: 'din', label: '🕌 Din', stroke: '#10b981' },
+    { key: 'ing', label: '🇬🇧 İngilizce', stroke: '#6366f1' },
+    { key: 'pct', label: '📈 Başarı %', stroke: '#8b5cf6' }
+  ];
+
+  filters.forEach(f => {
+    const isActive = appState.generalChartFilter === f.key;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.onclick = () => setGeneralChartFilter(f.key);
+    btn.className = `px-2.5 py-1 rounded-xl text-xs font-bold transition cursor-pointer touch-manipulation ${
+      isActive
+        ? 'bg-indigo-600 text-white shadow-sm ring-2 ring-indigo-300'
+        : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+    }`;
+    btn.innerText = f.label;
+    bar.appendChild(btn);
+  });
+}
+
+function setGeneralChartFilter(filterKey) {
+  appState.generalChartFilter = filterKey;
+  renderGeneralChartFilterButtons();
+  renderGeneralTrialsChart();
+}
+
+// Genel Deneme Ders Gelişim Grafiğini Çiz (Canvas)
+function renderGeneralTrialsChart() {
+  const canvas = document.getElementById('generalTrialsChart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.scale(dpr, dpr);
+
+  const w = rect.width;
+  const h = rect.height;
+  const padLeft = 45;
+  const padRight = 25;
+  const padTop = 25;
+  const padBottom = 35;
+
+  ctx.clearRect(0, 0, w, h);
+
+  const trials = appState.generalTrials || [];
+  if (trials.length === 0) {
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '13px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Henüz girilen okul veya dershane denemesi bulunmuyor.', w / 2, h / 2 - 8);
+    ctx.font = '11px sans-serif';
+    ctx.fillStyle = '#cbd5e1';
+    ctx.fillText('Yeni deneme eklediğinizde ders ders net gelişim grafiğiniz burada çizilecektir! 🎓', w / 2, h / 2 + 12);
+    return;
+  }
+
+  // Sınavları tarihe göre kronolojik sırala (En eskiden en yeniye)
+  const sorted = [...trials].sort((a, b) => (a.date > b.date ? 1 : -1));
+  const filter = appState.generalChartFilter || 'all';
+
+  // Seçilen filtreye göre veri ayıkla
+  let dataPoints = [];
+  let maxY = 20;
+  let lineCol = '#4f46e5';
+  let chartTitle = 'Toplam Net';
+
+  if (filter === 'all') {
+    lineCol = '#4f46e5';
+    chartTitle = 'Toplam Net';
+    dataPoints = sorted.map(t => parseFloat(t.totalNet) || 0);
+    const maxVal = Math.max(...dataPoints, 0);
+    maxY = Math.max(100, Math.ceil((maxVal + 10) / 10) * 10);
+  } else if (filter === 'pct') {
+    lineCol = '#8b5cf6';
+    chartTitle = 'Başarı Yüzdesi (%)';
+    dataPoints = sorted.map(t => parseFloat(t.scorePct) || 0);
+    maxY = 100;
+  } else {
+    // Ders bazında
+    const subConfig = DEFAULT_GENERAL_SUBJECTS.find(s => s.code === filter);
+    lineCol = subConfig ? subConfig.strokeCol : '#4f46e5';
+    chartTitle = subConfig ? `${subConfig.name} Neti` : 'Ders Neti';
+    
+    dataPoints = sorted.map(t => {
+      const match = (t.subjects || []).find(s => s.code === filter);
+      return match ? (parseFloat(match.net) || 0) : null;
+    });
+
+    const validVals = dataPoints.filter(v => v !== null);
+    const maxVal = validVals.length > 0 ? Math.max(...validVals) : 0;
+    maxY = Math.max(20, Math.ceil((maxVal + 2) / 5) * 5);
+  }
+
+  // Yatay Kılavuz Çizgileri
+  const stepY = maxY <= 25 ? 5 : (maxY <= 50 ? 10 : 20);
+  ctx.strokeStyle = '#f1f5f9';
+  ctx.lineWidth = 1;
+  ctx.font = '10px sans-serif';
+  ctx.fillStyle = '#94a3b8';
+  ctx.textAlign = 'right';
+
+  for (let score = 0; score <= maxY; score += stepY) {
+    const y = padTop + (h - padTop - padBottom) * (1 - score / maxY);
+    ctx.beginPath();
+    ctx.moveTo(padLeft, y);
+    ctx.lineTo(w - padRight, y);
+    ctx.stroke();
+    ctx.fillText(`${score}${filter === 'pct' ? '%' : ''}`, padLeft - 8, y + 4);
+  }
+
+  // Noktaları Konumlandır
+  const stepX = sorted.length > 1 ? (w - padLeft - padRight) / (sorted.length - 1) : 0;
+  const points = [];
+
+  sorted.forEach((t, i) => {
+    const x = sorted.length === 1 ? (padLeft + (w - padLeft - padRight) / 2) : (padLeft + i * stepX);
+    const val = dataPoints[i];
+    if (val !== null && !isNaN(val)) {
+      const y = padTop + (h - padTop - padBottom) * (1 - Math.max(0, Math.min(maxY, val)) / maxY);
+      points.push({ x, y, val, trial: t, idx: i });
+    }
+  });
+
+  if (points.length > 0) {
+    // Alan Doldurma (Gradient Fill)
+    const firstP = points[0];
+    const lastP = points[points.length - 1];
+    const bottomY = h - padBottom;
+
+    const grad = ctx.createLinearGradient(0, padTop, 0, bottomY);
+    grad.addColorStop(0, `${lineCol}33`); // %20 saydam
+    grad.addColorStop(1, `${lineCol}00`); // %0 saydam
+
+    ctx.beginPath();
+    ctx.moveTo(firstP.x, bottomY);
+    points.forEach(p => ctx.lineTo(p.x, p.y));
+    ctx.lineTo(lastP.x, bottomY);
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // Çizgiyi Çiz
+    ctx.beginPath();
+    ctx.strokeStyle = lineCol;
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    points.forEach((p, idx) => {
+      if (idx === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    });
+    ctx.stroke();
+
+    // Noktaları ve Değerleri Çiz
+    points.forEach(p => {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+      ctx.strokeStyle = lineCol;
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+
+      // Değer Etiketi
+      ctx.fillStyle = '#0f172a';
+      ctx.font = 'bold 10px sans-serif';
+      ctx.textAlign = 'center';
+      const displayVal = filter === 'pct' ? `%${Math.round(p.val)}` : p.val.toFixed(1);
+      ctx.fillText(displayVal, p.x, p.y - 8);
+    });
+  }
+
+  // X Ekseni Etiketleri (Sınav Adları / Numaraları)
+  ctx.fillStyle = '#64748b';
+  ctx.font = '10px sans-serif';
+  ctx.textAlign = 'center';
+
+  sorted.forEach((t, i) => {
+    const x = sorted.length === 1 ? (padLeft + (w - padLeft - padRight) / 2) : (padLeft + i * stepX);
+    const shortLabel = `D${i + 1}`;
+    ctx.fillText(shortLabel, x, h - 14);
+
+    // Tarih etiketi (küçük)
+    ctx.font = '8px sans-serif';
+    ctx.fillStyle = '#94a3b8';
+    const shortDate = t.date ? t.date.substring(5).replace('-', '/') : '';
+    ctx.fillText(shortDate, x, h - 4);
+    ctx.font = '10px sans-serif';
+    ctx.fillStyle = '#64748b';
+  });
+}
+
+// Akıllı Ders Analizi & Pedagojik Rehberlik Kartlarını Çiz
+function renderGeneralPedagogicalAnalysis(subjectStats, trials) {
+  const container = document.getElementById('generalPedagogicalCards');
+  if (!container) return;
+  container.innerHTML = '';
+
+  if (trials.length === 0) {
+    container.innerHTML = `
+      <div class="bg-white rounded-xl p-4 border border-indigo-100 shadow-xs">
+        <div class="flex items-center gap-2 text-indigo-700 font-bold text-xs mb-1">
+          <i class="fa-solid fa-lightbulb"></i> 1. Tüm Dersleri Takip Edin
+        </div>
+        <p class="text-[11px] text-slate-600 leading-relaxed">
+          Okul veya dershanede girdiğin her denemeden sonra doğru, yanlış ve boş sayılarını girerek hangi derste ne durumda olduğunu anında görebilirsin.
+        </p>
+      </div>
+      <div class="bg-white rounded-xl p-4 border border-indigo-100 shadow-xs">
+        <div class="flex items-center gap-2 text-indigo-700 font-bold text-xs mb-1">
+          <i class="fa-solid fa-chart-column"></i> 2. Değişken Soru Sayıları
+        </div>
+        <p class="text-[11px] text-slate-600 leading-relaxed">
+          90 soruluk LGS standart denemesi veya 75-80 soruluk kurumsal denemelerde soru sayılarını ders bazında dilediğin gibi ayarlayabilirsin.
+        </p>
+      </div>
+      <div class="bg-white rounded-xl p-4 border border-indigo-100 shadow-xs">
+        <div class="flex items-center gap-2 text-indigo-700 font-bold text-xs mb-1">
+          <i class="fa-solid fa-bullseye"></i> 3. Hedef Odaklı Analiz
+        </div>
+        <p class="text-[11px] text-slate-600 leading-relaxed">
+          Sistem sınav sonuçlarınıza göre en başarılı olduğunuz ve en çok tekrar yapmanız gereken dersleri otomatik olarak analiz eder.
+        </p>
+      </div>
+    `;
+    return;
+  }
+
+  // Sınavlarda yer almış dersleri başarı yüzdesine göre sırala
+  const activeSubjects = subjectStats.filter(s => s.count > 0).sort((a, b) => b.avgPct - a.avgPct);
+
+  if (activeSubjects.length === 0) return;
+
+  const bestSubject = activeSubjects[0];
+  const lowestSubject = activeSubjects[activeSubjects.length - 1];
+
+  // 1. Kart: En Güçlü Ders
+  const card1 = document.createElement('div');
+  card1.className = 'bg-white rounded-xl p-4 border-2 border-emerald-200 shadow-xs flex flex-col justify-between';
+  card1.innerHTML = `
+    <div>
+      <div class="flex items-center justify-between mb-1.5">
+        <span class="text-xs font-bold text-emerald-800 flex items-center gap-1.5">
+          <i class="fa-solid fa-crown text-amber-500"></i> En Güçlü Ders (Zirve)
+        </span>
+        <span class="text-[10px] bg-emerald-100 text-emerald-800 font-black px-2 py-0.5 rounded-full">%${bestSubject.avgPct.toFixed(0)} Başarı</span>
+      </div>
+      <h4 class="text-sm font-black text-slate-900 mt-1">${bestSubject.name}</h4>
+      <p class="text-[11px] text-slate-600 mt-1 leading-relaxed">
+        İley, <strong>${bestSubject.name}</strong> dersinde ortalama <strong>${bestSubject.avgNet.toFixed(2)} net</strong> ile mükemmel bir seviyede. Bu dersteki soru çözme hızı ve doğruluğu moral ve net kaynağı!
+      </p>
+    </div>
+    <div class="mt-3 pt-2 border-t border-slate-100 text-[10px] text-emerald-700 font-bold flex items-center gap-1">
+      <i class="fa-solid fa-circle-check"></i> Bu başarıyı düzenli tekrarlarla koruyunuz.
+    </div>
+  `;
+
+  // 2. Kart: Öncelikli Çalışma Gereken Ders
+  const card2 = document.createElement('div');
+  card2.className = 'bg-white rounded-xl p-4 border-2 border-rose-200 shadow-xs flex flex-col justify-between';
+  card2.innerHTML = `
+    <div>
+      <div class="flex items-center justify-between mb-1.5">
+        <span class="text-xs font-bold text-rose-800 flex items-center gap-1.5">
+          <i class="fa-solid fa-triangle-exclamation text-rose-500"></i> Öncelikli Gelişim Alanı
+        </span>
+        <span class="text-[10px] bg-rose-100 text-rose-800 font-black px-2 py-0.5 rounded-full">%${lowestSubject.avgPct.toFixed(0)} Başarı</span>
+      </div>
+      <h4 class="text-sm font-black text-slate-900 mt-1">${lowestSubject.name}</h4>
+      <p class="text-[11px] text-slate-600 mt-1 leading-relaxed">
+        En fazla net artışı potansiyeli <strong>${lowestSubject.name}</strong> dersinde (Ortalama ${lowestSubject.avgNet.toFixed(2)} net, toplam ${lowestSubject.totalW} yanlış). Bu dersteki boş ve yanlış soruların analizi genel neti hızla yükseltecektir.
+      </p>
+    </div>
+    <div class="mt-3 pt-2 border-t border-slate-100 text-[10px] text-rose-700 font-bold flex items-center gap-1">
+      <i class="fa-solid fa-arrow-up-right-dots"></i> Yapılamayan soruları öğretmenle çözünüz!
+    </div>
+  `;
+
+  // 3. Kart: Sınav Taktiği ve Boş Bırakma Analizi
+  const totalWrongAll = trials.reduce((sum, t) => sum + (parseInt(t.totalWrong) || 0), 0);
+  const netLostToPenalty = (totalWrongAll / 3).toFixed(1);
+
+  const card3 = document.createElement('div');
+  card3.className = 'bg-white rounded-xl p-4 border-2 border-indigo-200 shadow-xs flex flex-col justify-between';
+  card3.innerHTML = `
+    <div>
+      <div class="flex items-center justify-between mb-1.5">
+        <span class="text-xs font-bold text-indigo-800 flex items-center gap-1.5">
+          <i class="fa-solid fa-bullseye text-indigo-600"></i> Sınav Taktiği & Net Koruma
+        </span>
+        <span class="text-[10px] bg-indigo-100 text-indigo-800 font-black px-2 py-0.5 rounded-full">LGS Kuralı</span>
+      </div>
+      <h4 class="text-sm font-black text-slate-900 mt-1">Yanlış - Net Dengesi</h4>
+      <p class="text-[11px] text-slate-600 mt-1 leading-relaxed">
+        Şimdiye kadar yapılan ${totalWrongAll} yanlış, 3 yanlış 1 doğru kuralı sebebiyle yaklaşık <strong>-${netLostToPenalty} doğruyu</strong> götürdü. İki şık arasında kalınmayan, hiç bilinmeyen sorularda boş bırakmak netleri korur.
+      </p>
+    </div>
+    <div class="mt-3 pt-2 border-t border-slate-100 text-[10px] text-indigo-700 font-bold flex items-center gap-1">
+      <i class="fa-solid fa-shield-halved"></i> Emin olunmayan sorularda dikkatli olunuz.
+    </div>
+  `;
+
+  container.appendChild(card1);
+  container.appendChild(card2);
+  container.appendChild(card3);
+}
+
+// Girilen Genel Denemeler Listesini Çiz
+function renderGeneralTrialsList() {
+  const container = document.getElementById('generalTrialsList');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const trials = appState.generalTrials || [];
+
+  if (trials.length === 0) {
+    container.innerHTML = `
+      <div class="bg-white rounded-2xl p-8 border border-slate-200 text-center space-y-3">
+        <div class="w-16 h-16 mx-auto rounded-3xl bg-indigo-50 border border-indigo-200 text-indigo-600 flex items-center justify-center text-3xl shadow-sm">
+          <i class="fa-solid fa-file-signature"></i>
+        </div>
+        <h4 class="text-base font-bold text-slate-900">Henüz Genel Deneme Sınavı Eklenmedi</h4>
+        <p class="text-xs text-slate-500 max-w-md mx-auto">
+          Okulda veya dershanede girdiğiniz tüm denemelerin ders bazlı sonuçlarını ekleyerek öğrencinizin performansını ve karnesini buradan takip edebilirsiniz.
+        </p>
+        <button type="button" onclick="openGeneralTrialModal()" class="mt-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-md transition inline-flex items-center gap-2 cursor-pointer">
+          <i class="fa-solid fa-plus"></i>
+          <span>İlk Genel Deneme Sonucunu Gir</span>
+        </button>
+      </div>
+    `;
+    return;
+  }
+
+  // En yeniden en eskiye sırala
+  const sorted = [...trials].sort((a, b) => (a.date < b.date ? 1 : -1));
+
+  sorted.forEach((trial, index) => {
+    const card = document.createElement('div');
+    card.className = 'bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm hover:border-indigo-300 transition space-y-3.5';
+
+    // Dersler rozetleri dökümü
+    let subjectsHtml = '';
+    if (Array.isArray(trial.subjects)) {
+      subjectsHtml = trial.subjects.map(s => {
+        const subConf = DEFAULT_GENERAL_SUBJECTS.find(d => d.code === s.code);
+        const nameShort = subConf ? subConf.name.substring(0, 3).toUpperCase() : s.code.toUpperCase();
+        const stroke = subConf ? subConf.strokeCol : '#6366f1';
+        return `
+          <div class="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 text-[11px]">
+            <span class="font-black" style="color: ${stroke}">${nameShort}:</span>
+            <span class="font-bold text-slate-800">${s.correct}D ${s.wrong}Y</span>
+            <span class="text-[10px] text-slate-400 font-mono">(${parseFloat(s.net).toFixed(2)} Net)</span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Derece ve Sıralama Çiğleri
+    let ranksHtml = '';
+    if (trial.rankSchool) {
+      ranksHtml += `<span class="text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-lg flex items-center gap-1"><i class="fa-solid fa-school text-[10px]"></i> Okul: ${trial.rankSchool}</span>`;
+    }
+    if (trial.rankClass) {
+      ranksHtml += `<span class="text-[11px] font-bold bg-blue-50 text-blue-800 border border-blue-200 px-2 py-0.5 rounded-lg flex items-center gap-1"><i class="fa-solid fa-users text-[10px]"></i> Sınıf: ${trial.rankClass}</span>`;
+    }
+    if (trial.scorePoints) {
+      ranksHtml += `<span class="text-[11px] font-bold bg-purple-50 text-purple-800 border border-purple-200 px-2 py-0.5 rounded-lg flex items-center gap-1"><i class="fa-solid fa-star text-[10px]"></i> ${trial.scorePoints} Puan</span>`;
+    }
+
+    card.innerHTML = `
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-slate-100 pb-3">
+        <div class="space-y-1">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-xs font-bold px-2.5 py-0.5 rounded-full ${
+              trial.location === 'Okul' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
+              (trial.location === 'Dershane' ? 'bg-purple-100 text-purple-800 border border-purple-200' : 'bg-slate-100 text-slate-700')
+            }">
+              ${trial.location || 'Genel Deneme'}
+            </span>
+            <h4 class="text-sm sm:text-base font-bold text-slate-900">${trial.name}</h4>
+          </div>
+          <p class="text-xs text-slate-500 flex items-center gap-2">
+            <span><i class="fa-regular fa-calendar text-slate-400"></i> ${trial.date}</span>
+            <span>•</span>
+            <span>${trial.totalQuestions} Soru</span>
+            ${trial.photoUrl ? '<span>•</span><span class="text-indigo-600 font-semibold"><i class="fa-solid fa-paperclip"></i> Sonuç Belgesi Var</span>' : ''}
+          </p>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <div class="text-right">
+            <div class="text-lg sm:text-xl font-black text-indigo-700">${trial.totalNet} Net</div>
+            <div class="text-[10px] text-slate-500 font-bold">Başarı: %${trial.scorePct} (${trial.totalCorrect}D • ${trial.totalWrong}Y)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dersler Listesi -->
+      <div class="flex flex-wrap gap-1.5">
+        ${subjectsHtml}
+      </div>
+
+      <!-- Sıralamalar & Butonlar -->
+      <div class="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+        <div class="flex flex-wrap items-center gap-1.5">
+          ${ranksHtml}
+        </div>
+
+        <div class="flex items-center gap-1.5 self-end sm:self-auto">
+          <button type="button" onclick="openGeneralTrialDetail('${trial.id}')" class="text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold px-3 py-1.5 rounded-xl border border-indigo-200 transition flex items-center gap-1 cursor-pointer">
+            <i class="fa-solid fa-award text-xs"></i>
+            <span>Karne & Analiz</span>
+          </button>
+          <button type="button" onclick="editGeneralTrial('${trial.id}')" title="Düzenle" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold p-1.5 rounded-xl transition cursor-pointer">
+            <i class="fa-solid fa-pen-to-square text-xs"></i>
+          </button>
+          <button type="button" onclick="deleteGeneralTrial('${trial.id}')" title="Sil" class="text-xs bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold p-1.5 rounded-xl transition cursor-pointer">
+            <i class="fa-solid fa-trash-can text-xs"></i>
+          </button>
+        </div>
+      </div>
+    `;
+
+    container.appendChild(card);
+  });
+}
+
+// ----------------------------------------------------------------
+// GENEL DENEME MODAL YÖNETİMİ & VERİ GİRİŞİ
+// ----------------------------------------------------------------
+
+function openGeneralTrialModal(trialId = null) {
+  appState.editingGeneralTrialId = trialId;
+  appState.tempTrialPhotoBase64 = null;
+
+  const modal = document.getElementById('generalTrialModal');
+  const modalTitle = document.getElementById('generalTrialModalTitle');
+  const nameInput = document.getElementById('trialNameInput');
+  const dateInput = document.getElementById('trialDateInput');
+  const locationSelect = document.getElementById('trialLocationSelect');
+  const ruleSelect = document.getElementById('trialRuleSelect');
+  const rankSchool = document.getElementById('trialRankSchool');
+  const rankClass = document.getElementById('trialRankClass');
+  const pointsInput = document.getElementById('trialPoints');
+  const notesInput = document.getElementById('trialNotes');
+  const photoName = document.getElementById('trialPhotoName');
+  const photoPrevContainer = document.getElementById('trialPhotoPreviewContainer');
+  const photoPreview = document.getElementById('trialPhotoPreview');
+  const btnRemovePhoto = document.getElementById('btnRemoveTrialPhoto');
+
+  if (photoName) photoName.innerText = 'Fotoğraf seçilmedi';
+  if (photoPrevContainer) photoPrevContainer.classList.add('hidden');
+  if (btnRemovePhoto) btnRemovePhoto.classList.add('hidden');
+
+  if (trialId) {
+    // Düzenleme Modu
+    const trial = (appState.generalTrials || []).find(t => t.id === trialId);
+    if (!trial) return;
+
+    if (modalTitle) modalTitle.innerText = 'Genel Deneme Sınavını Düzenle';
+    if (nameInput) nameInput.value = trial.name || '';
+    if (dateInput) dateInput.value = trial.date || '';
+    if (locationSelect) locationSelect.value = trial.location || 'Okul';
+    if (ruleSelect) ruleSelect.value = trial.rule !== undefined ? trial.rule.toString() : '3';
+    if (rankSchool) rankSchool.value = trial.rankSchool || '';
+    if (rankClass) rankClass.value = trial.rankClass || '';
+    if (pointsInput) pointsInput.value = trial.scorePoints || '';
+    if (notesInput) notesInput.value = trial.notes || '';
+
+    // Dersleri Klonla
+    appState.tempTrialSubjects = JSON.parse(JSON.stringify(trial.subjects || []));
+
+    if (trial.photoUrl) {
+      appState.tempTrialPhotoBase64 = trial.photoUrl;
+      if (photoName) photoName.innerText = 'Kayıtlı fotoğraf mevcut';
+      if (photoPreview) photoPreview.src = trial.photoUrl;
+      if (photoPrevContainer) photoPrevContainer.classList.remove('hidden');
+      if (btnRemovePhoto) btnRemovePhoto.classList.remove('hidden');
+    }
+  } else {
+    // Yeni Ekleme Modu
+    if (modalTitle) modalTitle.innerText = 'Genel Deneme Sınavı Veri Girişi';
+    if (nameInput) nameInput.value = '';
+    if (dateInput) dateInput.value = new Date().toISOString().split('T')[0];
+    if (locationSelect) locationSelect.value = 'Okul';
+    if (ruleSelect) ruleSelect.value = '3';
+    if (rankSchool) rankSchool.value = '';
+    if (rankClass) rankClass.value = '';
+    if (pointsInput) pointsInput.value = '';
+    if (notesInput) notesInput.value = '';
+
+    // Varsayılan 90 soruluk MEB şablonu ile başlat
+    initDefaultTempTrialSubjects('90');
+  }
+
+  renderTrialSubjectsTable();
+  recalculateTrialLiveSummary();
+
+  if (modal) modal.classList.remove('hidden');
+}
+
+function closeGeneralTrialModal() {
+  const modal = document.getElementById('generalTrialModal');
+  if (modal) modal.classList.add('hidden');
+  appState.editingGeneralTrialId = null;
+  appState.tempTrialPhotoBase64 = null;
+}
+
+function initDefaultTempTrialSubjects(templateKey = '90') {
+  const tpl = GENERAL_TEMPLATES[templateKey] || GENERAL_TEMPLATES['90'];
+  appState.tempTrialSubjects = DEFAULT_GENERAL_SUBJECTS.map(s => {
+    const qCount = tpl[s.code] !== undefined ? tpl[s.code] : s.defaultQ;
+    return {
+      code: s.code,
+      name: s.name,
+      questions: qCount,
+      correct: 0,
+      wrong: 0,
+      empty: qCount,
+      net: 0.00,
+      pct: 0
+    };
+  });
+}
+
+function applyGeneralTemplate(templateKey) {
+  const tpl = GENERAL_TEMPLATES[templateKey];
+  if (!tpl) return;
+
+  appState.tempTrialSubjects.forEach(s => {
+    if (tpl[s.code] !== undefined) {
+      s.questions = tpl[s.code];
+      s.empty = Math.max(0, s.questions - s.correct - s.wrong);
+      recalcSubjectNet(s);
+    }
+  });
+
+  renderTrialSubjectsTable();
+  recalculateTrialLiveSummary();
+}
+
+function renderTrialSubjectsTable() {
+  const tbody = document.getElementById('trialSubjectsTableBody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  appState.tempTrialSubjects.forEach(s => {
+    const subConf = DEFAULT_GENERAL_SUBJECTS.find(d => d.code === s.code);
+    const stroke = subConf ? subConf.strokeCol : '#6366f1';
+    const isCustom = !subConf;
+
+    const tr = document.createElement('tr');
+    tr.className = 'hover:bg-slate-50/80 transition';
+    tr.innerHTML = `
+      <td class="px-3 py-2 flex items-center gap-2">
+        <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background-color: ${stroke}"></span>
+        <span class="font-bold text-slate-900 text-xs">${s.name}</span>
+      </td>
+      <td class="px-2 py-2 text-center">
+        <input type="number" min="1" max="100" value="${s.questions}" oninput="onTrialSubjectInputChange('${s.code}', 'questions', this.value)" class="w-16 text-center text-xs font-bold border border-slate-300 rounded-lg py-1 focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white">
+      </td>
+      <td class="px-2 py-2 text-center">
+        <input type="number" min="0" max="${s.questions}" value="${s.correct}" oninput="onTrialSubjectInputChange('${s.code}', 'correct', this.value)" class="w-16 text-center text-xs font-bold text-emerald-700 bg-emerald-50/50 border border-emerald-300 rounded-lg py-1 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+      </td>
+      <td class="px-2 py-2 text-center">
+        <input type="number" min="0" max="${s.questions}" value="${s.wrong}" oninput="onTrialSubjectInputChange('${s.code}', 'wrong', this.value)" class="w-16 text-center text-xs font-bold text-rose-700 bg-rose-50/50 border border-rose-300 rounded-lg py-1 focus:ring-2 focus:ring-rose-500 focus:outline-none">
+      </td>
+      <td class="px-2 py-2 text-center">
+        <input type="number" min="0" max="${s.questions}" value="${s.empty}" oninput="onTrialSubjectInputChange('${s.code}', 'empty', this.value)" class="w-16 text-center text-xs font-bold text-slate-700 bg-slate-50 border border-slate-300 rounded-lg py-1 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+      </td>
+      <td class="px-2 py-2 text-center font-black text-indigo-700 text-xs">
+        <span id="netCell_${s.code}">${parseFloat(s.net).toFixed(2)}</span>
+      </td>
+      <td class="px-2 py-2 text-center">
+        <span id="pctCell_${s.code}" class="px-2 py-0.5 rounded-full text-[10px] font-black ${
+          s.pct >= 80 ? 'bg-emerald-100 text-emerald-800' :
+          (s.pct >= 60 ? 'bg-blue-100 text-blue-800' : (s.pct >= 40 ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'))
+        }">%${Math.round(s.pct)}</span>
+      </td>
+      <td class="px-2 py-2 text-center">
+        ${isCustom ? `<button type="button" onclick="removeCustomGeneralSubject('${s.code}')" class="text-rose-500 hover:text-rose-700 text-xs p-1"><i class="fa-solid fa-trash-can"></i></button>` : ''}
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function recalcSubjectNet(s) {
+  const ruleEl = document.getElementById('trialRuleSelect');
+  const penalty = ruleEl ? (parseFloat(ruleEl.value) || 0) : 3;
+
+  const c = parseInt(s.correct) || 0;
+  const w = parseInt(s.wrong) || 0;
+  const q = parseInt(s.questions) || 0;
+
+  if (penalty <= 0) {
+    s.net = c;
+  } else {
+    s.net = Math.max(0, c - (w / penalty));
+  }
+  s.pct = q > 0 ? ((s.net / q) * 100) : 0;
+}
+
+function onTrialSubjectInputChange(code, field, val) {
+  const s = appState.tempTrialSubjects.find(item => item.code === code);
+  if (!s) return;
+
+  const intVal = Math.max(0, parseInt(val) || 0);
+
+  if (field === 'questions') {
+    s.questions = Math.max(1, intVal);
+    s.empty = Math.max(0, s.questions - s.correct - s.wrong);
+  } else if (field === 'correct') {
+    s.correct = intVal;
+    s.empty = Math.max(0, s.questions - s.correct - s.wrong);
+  } else if (field === 'wrong') {
+    s.wrong = intVal;
+    s.empty = Math.max(0, s.questions - s.correct - s.wrong);
+  } else if (field === 'empty') {
+    s.empty = intVal;
+  }
+
+  recalcSubjectNet(s);
+
+  // Hücreleri anında güncelle
+  const netCell = document.getElementById(`netCell_${code}`);
+  const pctCell = document.getElementById(`pctCell_${code}`);
+  if (netCell) netCell.innerText = s.net.toFixed(2);
+  if (pctCell) {
+    pctCell.innerText = `%${Math.round(s.pct)}`;
+    pctCell.className = `px-2 py-0.5 rounded-full text-[10px] font-black ${
+      s.pct >= 80 ? 'bg-emerald-100 text-emerald-800' :
+      (s.pct >= 60 ? 'bg-blue-100 text-blue-800' : (s.pct >= 40 ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'))
+    }`;
+  }
+
+  recalculateTrialLiveSummary();
+}
+
+function onTrialRuleChange() {
+  appState.tempTrialSubjects.forEach(s => recalcSubjectNet(s));
+  renderTrialSubjectsTable();
+  recalculateTrialLiveSummary();
+}
+
+function recalculateTrialLiveSummary() {
+  const subjects = appState.tempTrialSubjects || [];
+  const totalQ = subjects.reduce((sum, s) => sum + (parseInt(s.questions) || 0), 0);
+  const totalC = subjects.reduce((sum, s) => sum + (parseInt(s.correct) || 0), 0);
+  const totalW = subjects.reduce((sum, s) => sum + (parseInt(s.wrong) || 0), 0);
+  const totalE = subjects.reduce((sum, s) => sum + (parseInt(s.empty) || 0), 0);
+  const totalNet = subjects.reduce((sum, s) => sum + (parseFloat(s.net) || 0), 0);
+  const totalPct = totalQ > 0 ? ((totalNet / totalQ) * 100) : 0;
+
+  const tqEl = document.getElementById('trialLiveTotalQ');
+  const tcEl = document.getElementById('trialLiveCorrect');
+  const twEl = document.getElementById('trialLiveWrong');
+  const teEl = document.getElementById('trialLiveEmpty');
+  const tnEl = document.getElementById('trialLiveNet');
+  const tpEl = document.getElementById('trialLivePct');
+
+  if (tqEl) tqEl.innerText = totalQ;
+  if (tcEl) tcEl.innerText = totalC;
+  if (twEl) twEl.innerText = totalW;
+  if (teEl) teEl.innerText = totalE;
+  if (tnEl) tnEl.innerText = totalNet.toFixed(2);
+  if (tpEl) tpEl.innerText = `%${Math.round(totalPct)}`;
+}
+
+function addCustomGeneralSubject() {
+  const name = prompt('Eklemek istediğiniz dersin adını giriniz (Örn: Paragraf, Mantık vb.):');
+  if (!name || !name.trim()) return;
+
+  const cleanName = name.trim();
+  const code = 'custom_' + Date.now();
+  appState.tempTrialSubjects.push({
+    code,
+    name: cleanName,
+    questions: 10,
+    correct: 0,
+    wrong: 0,
+    empty: 10,
+    net: 0.00,
+    pct: 0
+  });
+
+  renderTrialSubjectsTable();
+  recalculateTrialLiveSummary();
+}
+
+function removeCustomGeneralSubject(code) {
+  appState.tempTrialSubjects = appState.tempTrialSubjects.filter(s => s.code !== code);
+  renderTrialSubjectsTable();
+  recalculateTrialLiveSummary();
+}
+
+// Sınav Sonuç Belgesi Fotoğrafı
+function handleTrialPhotoSelect(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const rawData = e.target.result;
+    // Sıkıştır
+    compressImageBase64(rawData, 1200, (compressed) => {
+      appState.tempTrialPhotoBase64 = compressed;
+      const photoName = document.getElementById('trialPhotoName');
+      const photoPrevContainer = document.getElementById('trialPhotoPreviewContainer');
+      const photoPreview = document.getElementById('trialPhotoPreview');
+      const btnRemove = document.getElementById('btnRemoveTrialPhoto');
+
+      if (photoName) photoName.innerText = file.name || 'Fotoğraf seçildi';
+      if (photoPreview) photoPreview.src = compressed;
+      if (photoPrevContainer) photoPrevContainer.classList.remove('hidden');
+      if (btnRemove) btnRemove.classList.remove('hidden');
+    });
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearTrialPhoto() {
+  appState.tempTrialPhotoBase64 = null;
+  const photoInput = document.getElementById('trialPhotoInput');
+  const photoName = document.getElementById('trialPhotoName');
+  const photoPrevContainer = document.getElementById('trialPhotoPreviewContainer');
+  const btnRemove = document.getElementById('btnRemoveTrialPhoto');
+
+  if (photoInput) photoInput.value = '';
+  if (photoName) photoName.innerText = 'Fotoğraf seçilmedi';
+  if (photoPrevContainer) photoPrevContainer.classList.add('hidden');
+  if (btnRemove) btnRemove.classList.add('hidden');
+}
+
+// Genel Denemeyi Kaydet (Submit)
+function saveGeneralTrialSubmit(event) {
+  event.preventDefault();
+
+  const name = document.getElementById('trialNameInput').value.trim();
+  const date = document.getElementById('trialDateInput').value;
+  const location = document.getElementById('trialLocationSelect').value;
+  const rule = parseFloat(document.getElementById('trialRuleSelect').value) || 3;
+  const rankSchool = document.getElementById('trialRankSchool').value.trim();
+  const rankClass = document.getElementById('trialRankClass').value.trim();
+  const points = document.getElementById('trialPoints').value.trim();
+  const notes = document.getElementById('trialNotes').value.trim();
+
+  if (!name) {
+    alert('Lütfen deneme sınavı adını giriniz.');
+    return;
+  }
+  if (!date) {
+    alert('Lütfen sınav tarihini seçiniz.');
+    return;
+  }
+
+  const subjects = appState.tempTrialSubjects || [];
+  const totalQ = subjects.reduce((sum, s) => sum + (parseInt(s.questions) || 0), 0);
+  const totalC = subjects.reduce((sum, s) => sum + (parseInt(s.correct) || 0), 0);
+  const totalW = subjects.reduce((sum, s) => sum + (parseInt(s.wrong) || 0), 0);
+  const totalE = subjects.reduce((sum, s) => sum + (parseInt(s.empty) || 0), 0);
+  const totalNet = subjects.reduce((sum, s) => sum + (parseFloat(s.net) || 0), 0);
+  const scorePct = totalQ > 0 ? ((totalNet / totalQ) * 100) : 0;
+
+  const trialObj = {
+    id: appState.editingGeneralTrialId || ('trial_' + Date.now()),
+    name,
+    date,
+    location,
+    rule,
+    subjects,
+    totalQuestions: totalQ,
+    totalCorrect: totalC,
+    totalWrong: totalW,
+    totalEmpty: totalE,
+    totalNet: parseFloat(totalNet.toFixed(2)),
+    scorePct: parseFloat(scorePct.toFixed(1)),
+    rankSchool,
+    rankClass,
+    scorePoints: points,
+    notes,
+    photoUrl: appState.tempTrialPhotoBase64 || '',
+    updatedAt: new Date().toISOString()
+  };
+
+  if (!Array.isArray(appState.generalTrials)) {
+    appState.generalTrials = [];
+  }
+
+  if (appState.editingGeneralTrialId) {
+    const idx = appState.generalTrials.findIndex(t => t.id === appState.editingGeneralTrialId);
+    if (idx !== -1) {
+      appState.generalTrials[idx] = trialObj;
+    } else {
+      appState.generalTrials.unshift(trialObj);
+    }
+  } else {
+    appState.generalTrials.unshift(trialObj);
+  }
+
+  // Kaydet & Buluta Yedekle
+  saveProgress();
+
+  closeGeneralTrialModal();
+  renderGeneralTrialsView();
+
+  // Kutlama Sesi & Bildirim
+  playSuccessSound();
+  showToastNotification(`🎉 '${name}' genel deneme sınavı başarıyla kaydedildi!`);
+}
+
+function editGeneralTrial(trialId) {
+  openGeneralTrialModal(trialId);
+}
+
+function deleteGeneralTrial(trialId) {
+  const trial = (appState.generalTrials || []).find(t => t.id === trialId);
+  const name = trial ? trial.name : 'bu denemeyi';
+  if (!confirm(`'${name}' kaydını silmek istediğinizden emin misiniz?`)) return;
+
+  appState.generalTrials = (appState.generalTrials || []).filter(t => t.id !== trialId);
+  saveProgress();
+  renderGeneralTrialsView();
+  showToastNotification(`🗑️ Deneme sınavı kaydı silindi.`);
+}
+
+// ----------------------------------------------------------------
+// AYRINTILI GENEL DENEME KARNESİ & ANALİZ MODALI
+// ----------------------------------------------------------------
+
+function openGeneralTrialDetail(trialId) {
+  const trial = (appState.generalTrials || []).find(t => t.id === trialId);
+  if (!trial) return;
+
+  activeDetailTrial = trial;
+
+  const modal = document.getElementById('generalTrialDetailModal');
+  const titleEl = document.getElementById('detailTrialTitle');
+  const subEl = document.getElementById('detailTrialSubtitle');
+  const content = document.getElementById('detailTrialContent');
+
+  if (titleEl) titleEl.innerText = trial.name;
+  if (subEl) subEl.innerText = `${trial.date} • ${trial.location || 'Genel Sınav'}`;
+
+  if (content) {
+    // Dersler Tablosu ve Barları
+    let subjectsHtml = '';
+    if (Array.isArray(trial.subjects)) {
+      subjectsHtml = trial.subjects.map(s => {
+        const subConf = DEFAULT_GENERAL_SUBJECTS.find(d => d.code === s.code);
+        const stroke = subConf ? subConf.strokeCol : '#6366f1';
+        const icon = subConf ? subConf.icon : 'fa-book';
+        const pct = Math.round(s.pct || 0);
+
+        return `
+          <div class="bg-slate-50 border border-slate-200/90 rounded-2xl p-3.5 space-y-2">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="w-6 h-6 rounded-lg flex items-center justify-center text-xs text-white" style="background-color: ${stroke}">
+                  <i class="fa-solid ${icon}"></i>
+                </span>
+                <span class="font-bold text-slate-900 text-xs sm:text-sm">${s.name}</span>
+              </div>
+              <div class="text-right">
+                <span class="text-sm sm:text-base font-black" style="color: ${stroke}">${parseFloat(s.net).toFixed(2)} Net</span>
+                <span class="text-[11px] text-slate-500 font-bold ml-1.5">(%${pct})</span>
+              </div>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+              <div class="h-full rounded-full transition-all duration-500" style="width: ${Math.min(100, Math.max(0, pct))}%; background-color: ${stroke}"></div>
+            </div>
+
+            <!-- Counts -->
+            <div class="flex items-center justify-between text-[11px] text-slate-500 pt-0.5">
+              <span>Toplam: <strong>${s.questions} Soru</strong></span>
+              <span>Doğru: <strong class="text-emerald-700">${s.correct}</strong></span>
+              <span>Yanlış: <strong class="text-rose-700">${s.wrong}</strong></span>
+              <span>Boş: <strong class="text-slate-600">${s.empty}</strong></span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    content.innerHTML = `
+      <!-- Karne Başlığı & Puan Kartı -->
+      <div class="bg-gradient-to-r from-indigo-700 via-indigo-600 to-purple-600 rounded-2xl p-5 text-white shadow-md">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <span class="bg-white/20 text-white text-[10px] uppercase font-black px-2.5 py-0.5 rounded-full">Sınav Karnesi</span>
+            <h3 class="text-xl font-black font-['Outfit'] mt-1">${trial.name}</h3>
+            <p class="text-xs text-indigo-100">Tarih: ${trial.date} • Uygulama Yeri: ${trial.location || 'Okul'}</p>
+          </div>
+          <div class="text-right bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-xl border border-white/20">
+            <span class="text-[10px] text-indigo-200 font-bold uppercase block">Toplam Net</span>
+            <span class="text-3xl font-black text-amber-300">${trial.totalNet}</span>
+            <span class="text-xs text-white/90 block font-semibold">/ ${trial.totalQuestions} Soru</span>
+          </div>
+        </div>
+
+        <!-- 4 Özet Sayaç -->
+        <div class="grid grid-cols-4 gap-2 mt-4 pt-3 border-t border-white/20 text-center text-xs">
+          <div>
+            <span class="text-indigo-200 text-[10px] block">Doğru</span>
+            <span class="font-black text-emerald-300 text-base">${trial.totalCorrect}</span>
+          </div>
+          <div>
+            <span class="text-indigo-200 text-[10px] block">Yanlış</span>
+            <span class="font-black text-rose-300 text-base">${trial.totalWrong}</span>
+          </div>
+          <div>
+            <span class="text-indigo-200 text-[10px] block">Boş</span>
+            <span class="font-black text-slate-300 text-base">${trial.totalEmpty}</span>
+          </div>
+          <div>
+            <span class="text-indigo-200 text-[10px] block">Başarı</span>
+            <span class="font-black text-amber-300 text-base">%${trial.scorePct}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sıralama & Derece Bilgileri (Varsa) -->
+      ${(trial.rankSchool || trial.rankClass || trial.scorePoints) ? `
+        <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-wrap items-center justify-around gap-3 text-xs">
+          ${trial.rankSchool ? `<div class="flex items-center gap-2"><i class="fa-solid fa-school text-indigo-600"></i> <span>Okul Sıralaması: <strong>${trial.rankSchool}</strong></span></div>` : ''}
+          ${trial.rankClass ? `<div class="flex items-center gap-2"><i class="fa-solid fa-users text-blue-600"></i> <span>Sınıf Sıralaması: <strong>${trial.rankClass}</strong></span></div>` : ''}
+          ${trial.scorePoints ? `<div class="flex items-center gap-2"><i class="fa-solid fa-star text-amber-500"></i> <span>Puan: <strong>${trial.scorePoints}</strong></span></div>` : ''}
+        </div>
+      ` : ''}
+
+      <!-- Ders Ders Ayrıntılı Analiz Listesi -->
+      <div class="space-y-3">
+        <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+          <i class="fa-solid fa-layer-group text-indigo-600"></i> Ders Bazında Net ve Doğruluk Dağılımı
+        </h4>
+        <div class="space-y-2.5">
+          ${subjectsHtml}
+        </div>
+      </div>
+
+      <!-- Sınav Notu (Varsa) -->
+      ${trial.notes ? `
+        <div class="bg-amber-50/70 border border-amber-200 rounded-2xl p-4 text-xs space-y-1">
+          <span class="font-bold text-amber-900 flex items-center gap-1.5">
+            <i class="fa-solid fa-pen-nib text-amber-600"></i> Sınav Değerlendirme Notu:
+          </span>
+          <p class="text-slate-700 leading-relaxed pl-5">${trial.notes}</p>
+        </div>
+      ` : ''}
+
+      <!-- Sınav Sonuç Belgesi Fotoğrafı (Varsa) -->
+      ${trial.photoUrl ? `
+        <div class="border border-slate-200 rounded-2xl p-4 bg-white space-y-2">
+          <span class="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+            <i class="fa-solid fa-camera text-indigo-600"></i> Sınav Sonuç Belgesi Fotoğrafı:
+          </span>
+          <div class="text-center">
+            <img src="${trial.photoUrl}" alt="Sonuç Belgesi" onclick="zoomImage('${trial.photoUrl}', '${trial.name} - Sonuç Belgesi', '')" class="max-h-72 mx-auto rounded-xl shadow-sm border border-slate-200 object-contain cursor-pointer hover:opacity-95 transition">
+            <p class="text-[10px] text-slate-400 mt-1">Büyütmek için fotoğrafa dokunabilirsiniz</p>
+          </div>
+        </div>
+      ` : ''}
+    `;
+  }
+
+  if (modal) modal.classList.remove('hidden');
+}
+
+function closeGeneralTrialDetail() {
+  const modal = document.getElementById('generalTrialDetailModal');
+  if (modal) modal.classList.add('hidden');
+  activeDetailTrial = null;
+}
+
+// WhatsApp İle Genel Deneme Karnesi Paylaşımı
+function shareCurrentTrialWhatsApp() {
+  if (!activeDetailTrial) return;
+  const t = activeDetailTrial;
+
+  let msg = `🏆 *İLEY 6. SINIF GENEL DENEME KARNESİ*\n`;
+  msg += `📅 *Tarih:* ${t.date} | *Sınav:* ${t.name} (${t.location || 'Okul'})\n`;
+  msg += `📊 *TOPLAM NET:* ${t.totalNet} / ${t.totalQuestions} Soru (%${t.scorePct} Başarı)\n`;
+  msg += `✅ *Doğru:* ${t.totalCorrect} | ❌ *Yanlış:* ${t.totalWrong} | ⚪ *Boş:* ${t.totalEmpty}\n`;
+
+  if (t.rankSchool || t.rankClass || t.scorePoints) {
+    msg += `🏅 `;
+    if (t.rankSchool) msg += `Okul Sırası: ${t.rankSchool} `;
+    if (t.rankClass) msg += `| Sınıf: ${t.rankClass} `;
+    if (t.scorePoints) msg += `| Puan: ${t.scorePoints}`;
+    msg += `\n`;
+  }
+
+  msg += `\n📚 *DERS DERS DÖKÜM:*\n`;
+  if (Array.isArray(t.subjects)) {
+    t.subjects.forEach(s => {
+      msg += `▫️ *${s.name}:* ${s.correct}D ${s.wrong}Y ${s.empty}B ➔ *${parseFloat(s.net).toFixed(2)} Net* (%${Math.round(s.pct)})\n`;
+    });
+  }
+
+  if (t.notes) {
+    msg += `\n✍️ *Değerlendirme:* ${t.notes}\n`;
+  }
+
+  msg += `\n🌟 Tebrikler İley, düzenli ve kararlı adımlarla başarıya! 🚀`;
+
+  const encoded = encodeURIComponent(msg);
+  window.open(`https://api.whatsapp.com/send?text=${encoded}`, '_blank');
 }
 
 // ================================================================
@@ -2958,6 +4255,7 @@ async function syncProgressToCloud() {
       completedTasks: appState.completedTasks,
       testResults: appState.testResults,
       questions: appState.questions || [],
+      generalTrials: appState.generalTrials || [],
       xp: appState.xp,
       streak: appState.streak,
       lastStreakDate: appState.lastStreakDate,

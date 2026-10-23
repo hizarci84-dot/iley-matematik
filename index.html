@@ -170,7 +170,7 @@
         </button>
         <button onclick="switchTab('denemeler')" id="tab-btn-denemeler" class="nav-tab flex items-center gap-2 px-3 py-1.5 rounded-lg font-medium transition text-white/80 hover:text-white hover:bg-white/10">
           <i class="fa-solid fa-trophy text-amber-300"></i>
-          <span>6 Jumbo Denemeler</span>
+          <span>Denemeler & Sınavlar</span>
         </button>
         <button onclick="switchTab('books')" id="tab-btn-books" class="nav-tab flex items-center gap-2 px-3 py-1.5 rounded-lg font-medium transition text-white/80 hover:text-white hover:bg-white/10">
           <i class="fa-solid fa-book-open-reader text-emerald-300"></i>
@@ -278,6 +278,11 @@
                 <button type="button" onclick="openUploadQuestionModal()" title="Yapamadığın sorunun fotoğrafını çekip Google Drive'a yükle" class="bg-rose-50 hover:bg-rose-100 active:scale-95 text-rose-700 border border-rose-200 font-bold text-xs px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 touch-manipulation cursor-pointer">
                   <i class="fa-solid fa-camera text-sm pointer-events-none text-rose-600"></i>
                   <span>Soru Yükle</span>
+                </button>
+                <!-- General Trial Exam Button -->
+                <button type="button" onclick="openGeneralTrialModal()" title="Okulda veya dershanede girdiğin genel deneme sınavı sonucunu gir" class="bg-indigo-50 hover:bg-indigo-100 active:scale-95 text-indigo-700 border border-indigo-200 font-bold text-xs px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 touch-manipulation cursor-pointer">
+                  <i class="fa-solid fa-graduation-cap text-sm pointer-events-none text-indigo-600"></i>
+                  <span>Genel Deneme Gir</span>
                 </button>
                 <span id="dailyWorkloadBadge" class="text-xs bg-slate-100 text-slate-600 font-semibold px-2.5 py-1 rounded-full hidden sm:inline">Dengeli Dağılım</span>
               </div>
@@ -455,64 +460,215 @@
     <!-- ========================================== -->
     <section id="view-denemeler" class="tab-view hidden space-y-6">
       
-      <!-- Deneme Hero Card -->
-      <div class="bg-gradient-to-r from-amber-600 via-amber-500 to-yellow-500 rounded-3xl p-6 sm:p-8 text-white shadow-lg relative overflow-hidden">
-        <div class="relative z-10 max-w-2xl">
-          <div class="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-2">
-            <i class="fa-solid fa-trophy text-amber-200"></i> Hafta Sonu Sınav Provasi
-          </div>
-          <h2 class="text-2xl sm:text-3xl font-extrabold font-['Outfit'] tracking-tight">6 Jumbo Matematik Deneme Bankası</h2>
-          <p class="text-amber-100 text-sm mt-1 leading-relaxed">
-            1 Kasım 2026 itibarıyla her Pazar günü 1 deneme sınavı çözülür. Her denemede 20 soru bulunur. Sınav sonrasında optik formu doldurup net puanını anında görebilirsin!
-          </p>
-          <div class="flex flex-wrap gap-4 mt-4 text-xs font-semibold">
-            <div class="bg-white/20 backdrop-blur-md rounded-xl px-3 py-2">
-              <span class="block text-amber-200 text-[10px] uppercase">Toplam Sınav</span>
-              <span class="text-lg font-bold">26 Deneme</span>
-            </div>
-            <div class="bg-white/20 backdrop-blur-md rounded-xl px-3 py-2">
-              <span class="block text-amber-200 text-[10px] uppercase">Toplam Soru</span>
-              <span class="text-lg font-bold">520 Soru</span>
-            </div>
-            <div class="bg-white/20 backdrop-blur-md rounded-xl px-3 py-2">
-              <span class="block text-amber-200 text-[10px] uppercase">Tamamlanan</span>
-              <span class="text-lg font-bold" id="denemeCompletedCount">0/26</span>
-            </div>
-            <div class="bg-white/20 backdrop-blur-md rounded-xl px-3 py-2">
-              <span class="block text-amber-200 text-[10px] uppercase">Ortalama Net</span>
-              <span class="text-lg font-bold" id="denemeAvgNet">0.00</span>
-            </div>
-          </div>
-        </div>
-        <div class="absolute -right-8 -bottom-8 text-white/10 text-9xl pointer-events-none">
-          <i class="fa-solid fa-award"></i>
-        </div>
+      <!-- Deneme Modülü Alt Sekme Seçici: Jumbo vs Genel Denemeler -->
+      <div class="flex items-center justify-center p-1.5 bg-slate-200/90 rounded-2xl max-w-xl mx-auto shadow-sm">
+        <button type="button" id="subtab-btn-jumbo" onclick="switchDenemeSubTab('jumbo')" class="flex-1 py-2.5 px-3 sm:px-5 rounded-xl text-xs sm:text-sm font-bold transition flex items-center justify-center gap-2 bg-white text-slate-900 shadow-sm cursor-pointer touch-manipulation">
+          <i class="fa-solid fa-trophy text-amber-500"></i>
+          <span>6 Jumbo Matematik (26 Sınav)</span>
+        </button>
+        <button type="button" id="subtab-btn-general" onclick="switchDenemeSubTab('general')" class="flex-1 py-2.5 px-3 sm:px-5 rounded-xl text-xs sm:text-sm font-bold transition flex items-center justify-center gap-2 text-slate-600 hover:text-slate-900 cursor-pointer touch-manipulation">
+          <i class="fa-solid fa-graduation-cap text-indigo-600"></i>
+          <span>Okul & Dershane Genel Denemeleri</span>
+          <span id="generalTrialsCountBadge" class="hidden px-2 py-0.5 text-[10px] bg-indigo-100 text-indigo-800 rounded-full font-black">0</span>
+        </button>
       </div>
 
-      <!-- Net Progress Chart Card -->
-      <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 sm:p-6">
-        <div class="flex items-center justify-between mb-4">
-          <div>
-            <h3 class="font-bold text-slate-900 font-['Outfit'] text-lg">Deneme Net Gelişim Grafiği</h3>
-            <p class="text-xs text-slate-500">Deneme 1'den Deneme 26'ya kadar net puanlarının artış grafiği</p>
-          </div>
-          <span class="text-xs bg-amber-100 text-amber-800 font-bold px-3 py-1 rounded-full">Hedef: 20 Net</span>
-        </div>
+      <!-- ========================================== -->
+      <!-- ALT GÖRÜNÜM 1: 6 JUMBO MATEMATİK DENEME BANKASI -->
+      <!-- ========================================== -->
+      <div id="subview-jumbo" class="space-y-6">
         
-        <div class="h-64 sm:h-72 w-full relative">
-          <canvas id="denemeNetChart"></canvas>
+        <!-- Deneme Hero Card -->
+        <div class="bg-gradient-to-r from-amber-600 via-amber-500 to-yellow-500 rounded-3xl p-6 sm:p-8 text-white shadow-lg relative overflow-hidden">
+          <div class="relative z-10 max-w-2xl">
+            <div class="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-2">
+              <i class="fa-solid fa-trophy text-amber-200"></i> Hafta Sonu Sınav Provasi
+            </div>
+            <h2 class="text-2xl sm:text-3xl font-extrabold font-['Outfit'] tracking-tight">6 Jumbo Matematik Deneme Bankası</h2>
+            <p class="text-amber-100 text-sm mt-1 leading-relaxed">
+              1 Kasım 2026 itibarıyla her Pazar günü 1 deneme sınavı çözülür. Her denemede 20 soru bulunur. Sınav sonrasında optik formu doldurup net puanını anında görebilirsin!
+            </p>
+            <div class="flex flex-wrap gap-4 mt-4 text-xs font-semibold">
+              <div class="bg-white/20 backdrop-blur-md rounded-xl px-3 py-2">
+                <span class="block text-amber-200 text-[10px] uppercase">Toplam Sınav</span>
+                <span class="text-lg font-bold">26 Deneme</span>
+              </div>
+              <div class="bg-white/20 backdrop-blur-md rounded-xl px-3 py-2">
+                <span class="block text-amber-200 text-[10px] uppercase">Toplam Soru</span>
+                <span class="text-lg font-bold">520 Soru</span>
+              </div>
+              <div class="bg-white/20 backdrop-blur-md rounded-xl px-3 py-2">
+                <span class="block text-amber-200 text-[10px] uppercase">Tamamlanan</span>
+                <span class="text-lg font-bold" id="denemeCompletedCount">0/26</span>
+              </div>
+              <div class="bg-white/20 backdrop-blur-md rounded-xl px-3 py-2">
+                <span class="block text-amber-200 text-[10px] uppercase">Ortalama Net</span>
+                <span class="text-lg font-bold" id="denemeAvgNet">0.00</span>
+              </div>
+            </div>
+          </div>
+          <div class="absolute -right-8 -bottom-8 text-white/10 text-9xl pointer-events-none">
+            <i class="fa-solid fa-award"></i>
+          </div>
         </div>
+
+        <!-- Net Progress Chart Card -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 sm:p-6">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="font-bold text-slate-900 font-['Outfit'] text-lg">Jumbo Deneme Net Gelişim Grafiği</h3>
+              <p class="text-xs text-slate-500">Deneme 1'den Deneme 26'ya kadar net puanlarının artış grafiği</p>
+            </div>
+            <span class="text-xs bg-amber-100 text-amber-800 font-bold px-3 py-1 rounded-full">Hedef: 20 Net</span>
+          </div>
+          
+          <div class="h-64 sm:h-72 w-full relative">
+            <canvas id="denemeNetChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Deneme Grid of All 26 Exams -->
+        <div class="space-y-3">
+          <h3 class="font-bold text-slate-900 font-['Outfit'] text-lg flex items-center gap-2">
+            <i class="fa-solid fa-calendar-check text-amber-500"></i>
+            26 Deneme Takvimi ve Sonuçları
+          </h3>
+          <div id="denemeGridList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- Rendered via JS -->
+          </div>
+        </div>
+
       </div>
 
-      <!-- Deneme Grid of All 26 Exams -->
-      <div class="space-y-3">
-        <h3 class="font-bold text-slate-900 font-['Outfit'] text-lg flex items-center gap-2">
-          <i class="fa-solid fa-calendar-check text-amber-500"></i>
-          26 Deneme Takvimi ve Sonuçları
-        </h3>
-        <div id="denemeGridList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <!-- Rendered via JS -->
+      <!-- ========================================== -->
+      <!-- ALT GÖRÜNÜM 2: OKUL & DERSHANE GENEL DENEMELERİ (TÜM DERSLER) -->
+      <!-- ========================================== -->
+      <div id="subview-general" class="space-y-6 hidden">
+
+        <!-- Genel Deneme Hero Card -->
+        <div class="bg-gradient-to-r from-indigo-700 via-indigo-600 to-purple-600 rounded-3xl p-6 sm:p-8 text-white shadow-lg relative overflow-hidden">
+          <div class="relative z-10 max-w-2xl">
+            <div class="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-2">
+              <i class="fa-solid fa-graduation-cap text-indigo-200"></i> Tüm Dersler • Çoklu Sınav Takibi
+            </div>
+            <h2 class="text-2xl sm:text-3xl font-extrabold font-['Outfit'] tracking-tight">Okul & Dershane Genel Denemeleri</h2>
+            <p class="text-indigo-100 text-sm mt-1 leading-relaxed">
+              Okulda ve dershanede girdiğin tüm kurumsal deneme sınavlarının sonuçları, değişken soru sayıları ve ders bazlı ayrıntılı başarı analizleri.
+            </p>
+            
+            <!-- Quick Stat Counters -->
+            <div class="flex flex-wrap gap-3 sm:gap-4 mt-4 text-xs font-semibold">
+              <div class="bg-white/20 backdrop-blur-md rounded-xl px-3 py-2">
+                <span class="block text-indigo-200 text-[10px] uppercase">Girilen Sınav</span>
+                <span class="text-lg font-bold" id="generalTotalCount">0 Deneme</span>
+              </div>
+              <div class="bg-white/20 backdrop-blur-md rounded-xl px-3 py-2">
+                <span class="block text-indigo-200 text-[10px] uppercase">Toplam Soru</span>
+                <span class="text-lg font-bold" id="generalTotalQuestions">0 Soru</span>
+              </div>
+              <div class="bg-white/20 backdrop-blur-md rounded-xl px-3 py-2">
+                <span class="block text-indigo-200 text-[10px] uppercase">Ortalama Net</span>
+                <span class="text-lg font-bold text-amber-300" id="generalAvgNet">0.00</span>
+              </div>
+              <div class="bg-white/20 backdrop-blur-md rounded-xl px-3 py-2">
+                <span class="block text-indigo-200 text-[10px] uppercase">Başarı Yüzdesi</span>
+                <span class="text-lg font-bold text-emerald-300" id="generalAvgPct">%0</span>
+              </div>
+            </div>
+
+            <!-- Action Button -->
+            <div class="mt-5 flex flex-wrap gap-3">
+              <button type="button" onclick="openGeneralTrialModal()" class="bg-white text-indigo-800 hover:bg-indigo-50 active:scale-95 font-black text-xs sm:text-sm px-5 py-2.5 rounded-xl shadow-lg transition flex items-center gap-2 cursor-pointer touch-manipulation">
+                <i class="fa-solid fa-plus-circle text-base text-indigo-600 pointer-events-none"></i>
+                <span>Yeni Genel Deneme Sonucu Ekle</span>
+              </button>
+            </div>
+          </div>
+          <div class="absolute -right-8 -bottom-8 text-white/10 text-9xl pointer-events-none">
+            <i class="fa-solid fa-chart-pie"></i>
+          </div>
         </div>
+
+        <!-- DERS BAZINDA BAŞARI VE ORTALAMA ÖZET KARTLARI -->
+        <div class="space-y-3">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="font-bold text-slate-900 font-['Outfit'] text-lg flex items-center gap-2">
+                <i class="fa-solid fa-layer-group text-indigo-600"></i>
+                Ders Ders Başarı ve Net Ortalamaları
+              </h3>
+              <p class="text-xs text-slate-500">6 temel dersin sınavlar genelindeki doğru, yanlış, net ve başarı yüzdeleri</p>
+            </div>
+          </div>
+          
+          <div id="generalSubjectSummaryGrid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <!-- Dynamically populated via JS -->
+          </div>
+        </div>
+
+        <!-- İNTERAKTİF DERS DERS NET GELİŞİM GRAFİĞİ -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 sm:p-6 space-y-4">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div>
+              <h3 class="font-bold text-slate-900 font-['Outfit'] text-lg flex items-center gap-2">
+                <i class="fa-solid fa-chart-line text-indigo-600"></i>
+                Ders Bazında Net Gelişim Grafiği
+              </h3>
+              <p class="text-xs text-slate-500">Sınavdan sınava derslerindeki net değişimini ve başarı grafiğini incele</p>
+            </div>
+            
+            <!-- Ders Filtre Butonları -->
+            <div id="generalChartFilterBar" class="flex flex-wrap items-center gap-1.5 text-xs">
+              <!-- Dynamically populated or rendered -->
+            </div>
+          </div>
+
+          <!-- Canvas Chart -->
+          <div class="h-64 sm:h-72 w-full relative">
+            <canvas id="generalTrialsChart"></canvas>
+          </div>
+          
+          <!-- Chart Legend & Subtext -->
+          <div id="generalChartSubtext" class="text-[11px] text-slate-500 flex items-center justify-between border-t border-slate-100 pt-3">
+            <span>💡 İpucu: Yukarıdaki ders butonlarına basarak grafikte tek bir dersin gelişimini veya toplam netini görebilirsiniz.</span>
+          </div>
+        </div>
+
+        <!-- AKILLI DERS ANALİZİ VE PEDAGOJİK REHBERLİK -->
+        <div class="bg-gradient-to-br from-slate-50 to-indigo-50/50 rounded-2xl p-5 border border-indigo-100/80 shadow-sm space-y-4">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-sm shadow-sm">
+              <i class="fa-solid fa-brain"></i>
+            </div>
+            <div>
+              <h3 class="font-bold text-slate-900 font-['Outfit'] text-base sm:text-lg">Akıllı Ders Analizi & Rehberlik Raporu</h3>
+              <p class="text-xs text-slate-500">Girilen tüm genel deneme sonuçlarına göre otomatik çıkarılan pedagojik tavsiyeler</p>
+            </div>
+          </div>
+
+          <div id="generalPedagogicalCards" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <!-- Dynamically populated via JS: En Başarılı Ders, Öncelikli Çalışma Gereken Ders, Sınav Taktiği -->
+          </div>
+        </div>
+
+        <!-- GİRİLEN GENEL DENEMELER LİSTESİ (KARNELER) -->
+        <div class="space-y-3">
+          <div class="flex items-center justify-between">
+            <h3 class="font-bold text-slate-900 font-['Outfit'] text-lg flex items-center gap-2">
+              <i class="fa-solid fa-clipboard-list text-indigo-600"></i>
+              Girilen Genel Deneme Sınavları & Karneler
+            </h3>
+            <button type="button" onclick="openGeneralTrialModal()" class="text-xs bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold px-3 py-1.5 rounded-xl shadow-sm transition flex items-center gap-1.5 touch-manipulation cursor-pointer">
+              <i class="fa-solid fa-plus pointer-events-none"></i>
+              <span>Deneme Ekle</span>
+            </button>
+          </div>
+
+          <div id="generalTrialsList" class="space-y-3">
+            <!-- Dynamically populated via JS -->
+          </div>
+        </div>
+
       </div>
 
     </section>
@@ -1373,6 +1529,290 @@
     </div>
   </div>
 
+  <!-- ========================================== -->
+  <!-- MODAL: GENEL DENEME SINAVI VERİ GİRİŞİ      -->
+  <!-- ========================================== -->
+  <div id="generalTrialModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-0 sm:p-4 hidden transition-opacity">
+    <div class="bg-white rounded-none sm:rounded-3xl shadow-2xl border-0 sm:border border-slate-200 max-w-4xl w-full h-full sm:h-auto sm:max-h-[94vh] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
+      
+      <!-- Modal Header -->
+      <div class="bg-gradient-to-r from-indigo-700 via-indigo-600 to-purple-600 text-white px-4 sm:px-6 py-3.5 sm:py-4 flex items-center justify-between safe-area-top flex-shrink-0">
+        <div class="flex items-center space-x-3">
+          <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center text-base sm:text-lg text-white flex-shrink-0 shadow-md">
+            <i class="fa-solid fa-graduation-cap"></i>
+          </div>
+          <div>
+            <h3 id="generalTrialModalTitle" class="text-sm sm:text-base font-bold font-['Outfit']">Genel Deneme Sınavı Veri Girişi</h3>
+            <p class="text-[11px] text-indigo-100">Okul / Dershane denemeleri, değişken soru sayıları ve ders analizi</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeGeneralTrialModal()" aria-label="Kapat" class="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-white flex items-center justify-center transition flex-shrink-0 touch-manipulation cursor-pointer">
+          <i class="fa-solid fa-xmark text-lg pointer-events-none"></i>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <form id="generalTrialForm" onsubmit="saveGeneralTrialSubmit(event)" class="p-3.5 sm:p-6 overflow-y-auto space-y-4 sm:space-y-5 flex-1 overscroll-contain">
+        
+        <!-- 1. TEMEL SINAV BİLGİLERİ -->
+        <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <!-- Sınav Adı / Yayın -->
+          <div class="sm:col-span-2">
+            <label for="trialNameInput" class="block text-xs font-bold text-slate-800 mb-1">
+              🏷️ Deneme Adı / Yayın / Kurum:
+            </label>
+            <input type="text" id="trialNameInput" list="trialPresetsList" required placeholder="Örn: Özdebir 1. Türkiye Geneli / Hız 2. Kurumsal / Okul Denemesi 1" class="w-full text-xs sm:text-sm border border-slate-300 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <datalist id="trialPresetsList">
+              <option value="Özdebir 1. Türkiye Geneli Denemesi">
+              <option value="Özdebir 2. Türkiye Geneli Denemesi">
+              <option value="Töder 1. Genel Deneme Sınavı">
+              <option value="Hız Yayınları Kurumsal Deneme 1">
+              <option value="Hız Yayınları Kurumsal Deneme 2">
+              <option value="Sinan Kuzucu 1. Genel Deneme">
+              <option value="Okul 1. Dönem 1. Deneme Sınavı">
+              <option value="Okul 1. Dönem 2. Deneme Sınavı">
+              <option value="Dershane Seviye Belirleme Sınavı">
+              <option value="Fen Bilimleri Kurumsal Deneme">
+            </datalist>
+          </div>
+
+          <!-- Sınav Tarihi -->
+          <div>
+            <label for="trialDateInput" class="block text-xs font-bold text-slate-800 mb-1">
+              📅 Sınav Tarihi:
+            </label>
+            <input type="date" id="trialDateInput" required class="w-full text-xs sm:text-sm border border-slate-300 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          </div>
+
+          <!-- Uygulama Yeri -->
+          <div>
+            <label for="trialLocationSelect" class="block text-xs font-bold text-slate-800 mb-1">
+              🏫 Nerede Girildi?
+            </label>
+            <select id="trialLocationSelect" class="w-full text-xs sm:text-sm font-semibold border border-slate-300 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <option value="Okul">Okul Denemesi</option>
+              <option value="Dershane">Dershane / Kurs</option>
+              <option value="Ev">Evde Çözüldü / Bireysel</option>
+            </select>
+          </div>
+
+          <!-- Net Hesaplama Kuralı -->
+          <div class="sm:col-span-2">
+            <label for="trialRuleSelect" class="block text-xs font-bold text-slate-800 mb-1">
+              ⚖️ Yanlış Götürme Kuralı:
+            </label>
+            <select id="trialRuleSelect" onchange="onTrialRuleChange()" class="w-full text-xs sm:text-sm font-semibold border border-slate-300 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <option value="3">3 Yanlış 1 Doğruyu Götürür (LGS / MEB Standart Kuralı)</option>
+              <option value="0">Yanlış Doğruyu Götürmez (Net = Doğru)</option>
+              <option value="4">4 Yanlış 1 Doğruyu Götürür</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 2. HIZLI SORU SAYISI ŞABLONLARI -->
+        <div class="bg-indigo-50/60 p-3.5 rounded-2xl border border-indigo-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <div>
+            <span class="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
+              <i class="fa-solid fa-wand-magic-sparkles text-indigo-600"></i> Hızlı Soru Dağılımı Şablonları:
+            </span>
+            <p class="text-[11px] text-indigo-700">Denemenizin toplam soru sayısına göre tek tıkla ayarlayın veya aşağıdaki tablodan ders soru sayılarını dilediğiniz gibi değiştirin:</p>
+          </div>
+          <div class="flex flex-wrap items-center gap-1.5">
+            <button type="button" onclick="applyGeneralTemplate('90')" class="px-2.5 py-1.5 bg-white hover:bg-indigo-600 hover:text-white text-indigo-800 font-bold text-xs rounded-xl border border-indigo-200 transition shadow-sm cursor-pointer">
+              90 Soru (LGS)
+            </button>
+            <button type="button" onclick="applyGeneralTemplate('75')" class="px-2.5 py-1.5 bg-white hover:bg-indigo-600 hover:text-white text-indigo-800 font-bold text-xs rounded-xl border border-indigo-200 transition shadow-sm cursor-pointer">
+              75 Soru (6. Sınıf)
+            </button>
+            <button type="button" onclick="applyGeneralTemplate('80')" class="px-2.5 py-1.5 bg-white hover:bg-indigo-600 hover:text-white text-indigo-800 font-bold text-xs rounded-xl border border-indigo-200 transition shadow-sm cursor-pointer">
+              80 Soru
+            </button>
+            <button type="button" onclick="applyGeneralTemplate('100')" class="px-2.5 py-1.5 bg-white hover:bg-indigo-600 hover:text-white text-indigo-800 font-bold text-xs rounded-xl border border-indigo-200 transition shadow-sm cursor-pointer">
+              100 Soru
+            </button>
+          </div>
+        </div>
+
+        <!-- 3. DERS DERS VERİ GİRİŞ TABLOSU -->
+        <div class="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-sm">
+          <div class="bg-slate-100 px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-800">Ders Bazlı Sonuç Girişi</span>
+            <button type="button" onclick="addCustomGeneralSubject()" class="text-[11px] bg-white hover:bg-slate-200 text-indigo-700 border border-slate-300 font-bold px-2.5 py-1 rounded-lg transition flex items-center gap-1 cursor-pointer">
+              <i class="fa-solid fa-plus text-xs"></i> Başka Ders Ekle
+            </button>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
+                <tr>
+                  <th class="px-3 py-2.5">Ders Adı</th>
+                  <th class="px-2 py-2.5 text-center w-20">Soru Sayısı</th>
+                  <th class="px-2 py-2.5 text-center w-20 text-emerald-700">Doğru (D)</th>
+                  <th class="px-2 py-2.5 text-center w-20 text-rose-700">Yanlış (Y)</th>
+                  <th class="px-2 py-2.5 text-center w-20 text-slate-600">Boş (B)</th>
+                  <th class="px-2 py-2.5 text-center w-24 text-indigo-700">Net</th>
+                  <th class="px-2 py-2.5 text-center w-20">Başarı %</th>
+                  <th class="px-2 py-2.5 text-center w-10"></th>
+                </tr>
+              </thead>
+              <tbody id="trialSubjectsTableBody" class="divide-y divide-slate-100 font-medium">
+                <!-- Dynamically populated via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 4. CANLI TOPLAM HESAPLAMA VE ÖZET ŞERİDİ -->
+        <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-md">
+          <div class="flex flex-wrap items-center gap-4 sm:gap-6">
+            <div>
+              <span class="text-[10px] uppercase font-bold text-slate-400 block">Toplam Soru</span>
+              <span id="trialLiveTotalQ" class="text-xl sm:text-2xl font-black text-white">90</span>
+            </div>
+            <div>
+              <span class="text-[10px] uppercase font-bold text-emerald-400 block">Doğru</span>
+              <span id="trialLiveCorrect" class="text-xl sm:text-2xl font-black text-emerald-300">0</span>
+            </div>
+            <div>
+              <span class="text-[10px] uppercase font-bold text-rose-400 block">Yanlış</span>
+              <span id="trialLiveWrong" class="text-xl sm:text-2xl font-black text-rose-300">0</span>
+            </div>
+            <div>
+              <span class="text-[10px] uppercase font-bold text-slate-400 block">Boş</span>
+              <span id="trialLiveEmpty" class="text-xl sm:text-2xl font-black text-slate-300">90</span>
+            </div>
+            <div class="h-8 w-px bg-white/20"></div>
+            <div>
+              <span class="text-[10px] uppercase font-bold text-amber-300 block">Toplam Net</span>
+              <span id="trialLiveNet" class="text-2xl sm:text-3xl font-black text-amber-300">0.00</span>
+            </div>
+            <div>
+              <span class="text-[10px] uppercase font-bold text-blue-300 block">Başarı</span>
+              <span id="trialLivePct" class="text-xl sm:text-2xl font-black text-blue-200">%0</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. İSTEĞE BAĞLI EK BİLGİLER (SIRALAMA, NOTLAR, FOTOĞRAF) -->
+        <div class="border border-slate-200 rounded-2xl p-4 bg-slate-50/60 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+              <i class="fa-solid fa-medal text-amber-500"></i> İsteğe Bağlı Ek Bilgiler (Derece & Notlar):
+            </span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label for="trialRankSchool" class="block text-[11px] font-bold text-slate-700 mb-1">
+                🏫 Okul / Kurum Sıralaması:
+              </label>
+              <input type="text" id="trialRankSchool" placeholder="Örn: 2 / 120" class="w-full text-xs border border-slate-300 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div>
+              <label for="trialRankClass" class="block text-[11px] font-bold text-slate-700 mb-1">
+                👥 Şube / Sınıf Sıralaması:
+              </label>
+              <input type="text" id="trialRankClass" placeholder="Örn: 1 / 28" class="w-full text-xs border border-slate-300 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div>
+              <label for="trialPoints" class="block text-[11px] font-bold text-slate-700 mb-1">
+                ⭐ Toplam Puan (Varsa):
+              </label>
+              <input type="text" id="trialPoints" placeholder="Örn: 462.5" class="w-full text-xs border border-slate-300 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+          </div>
+
+          <!-- Öğrenci / Öğretmen Notu -->
+          <div>
+            <label for="trialNotes" class="block text-[11px] font-bold text-slate-700 mb-1">
+              ✍️ Sınav Değerlendirme Notu / Görüş:
+            </label>
+            <textarea id="trialNotes" rows="2" placeholder="Örn: Matematikte yeni nesil sorular zorladı, fen ve din çok başarılı geçti..." class="w-full text-xs border border-slate-300 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"></textarea>
+          </div>
+
+          <!-- Sınav Sonuç Belgesi Fotoğrafı -->
+          <div>
+            <label class="block text-[11px] font-bold text-slate-700 mb-1">
+              📸 Sınav Sonuç Belgesi / Karne Fotoğrafı (İsteğe Bağlı):
+            </label>
+            <div class="flex items-center gap-3">
+              <label class="bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 font-bold text-xs px-3.5 py-2 rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-sm">
+                <i class="fa-solid fa-camera text-indigo-600"></i>
+                <span>Fotoğraf Çek / Seç</span>
+                <input type="file" id="trialPhotoInput" accept="image/*" capture="environment" onchange="handleTrialPhotoSelect(event)" class="hidden">
+              </label>
+              <span id="trialPhotoName" class="text-xs text-slate-500">Fotoğraf seçilmedi</span>
+              <button type="button" id="btnRemoveTrialPhoto" onclick="clearTrialPhoto()" class="hidden text-xs text-rose-600 hover:text-rose-700 font-bold cursor-pointer">
+                Kaldır
+              </button>
+            </div>
+            <div id="trialPhotoPreviewContainer" class="hidden mt-2">
+              <img id="trialPhotoPreview" src="" alt="Sonuç Belgesi" class="max-h-40 rounded-xl border border-slate-300 object-contain shadow-sm">
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Submit & Kapat Footer -->
+        <div class="pt-2 flex items-center justify-end gap-2 border-t border-slate-200">
+          <button type="button" onclick="closeGeneralTrialModal()" class="px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer">
+            Vazgeç
+          </button>
+          <button type="submit" id="btnSaveGeneralTrial" class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs sm:text-sm font-bold rounded-xl shadow-md transition flex items-center gap-2 cursor-pointer">
+            <i class="fa-solid fa-check"></i>
+            <span>Sonucu Kaydet & Analiz Et</span>
+          </button>
+        </div>
+
+      </form>
+
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: AYRINTILI GENEL DENEME KARNESİ & ANALİZ -->
+  <!-- ========================================== -->
+  <div id="generalTrialDetailModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-0 sm:p-4 hidden transition-opacity">
+    <div class="bg-white rounded-none sm:rounded-3xl shadow-2xl border-0 sm:border border-slate-200 max-w-3xl w-full h-full sm:h-auto sm:max-h-[94vh] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
+      
+      <!-- Modal Header -->
+      <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white px-4 sm:px-6 py-3.5 sm:py-4 flex items-center justify-between safe-area-top flex-shrink-0">
+        <div class="flex items-center space-x-3">
+          <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-base sm:text-lg text-white flex-shrink-0 shadow-md">
+            <i class="fa-solid fa-award"></i>
+          </div>
+          <div>
+            <h3 id="detailTrialTitle" class="text-sm sm:text-base font-bold font-['Outfit']">Deneme Sınavı Karnesi</h3>
+            <p id="detailTrialSubtitle" class="text-[11px] text-slate-400">Ayrıntılı ders analizleri ve net dökümü</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeGeneralTrialDetail()" aria-label="Kapat" class="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-white flex items-center justify-center transition flex-shrink-0 touch-manipulation cursor-pointer">
+          <i class="fa-solid fa-xmark text-lg pointer-events-none"></i>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div id="detailTrialContent" class="p-4 sm:p-6 overflow-y-auto space-y-5 flex-1 overscroll-contain">
+        <!-- Dynamically rendered detailed report card -->
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="bg-slate-50 border-t border-slate-200 px-4 sm:px-6 py-3 flex items-center justify-between safe-area-bottom flex-shrink-0">
+        <button type="button" onclick="closeGeneralTrialDetail()" class="text-xs bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold px-4 py-2.5 rounded-xl transition cursor-pointer">
+          Kapat
+        </button>
+        <div class="flex items-center gap-2">
+          <button type="button" id="btnShareTrialWhatsApp" onclick="shareCurrentTrialWhatsApp()" class="text-xs bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold px-4 py-2.5 rounded-xl shadow-md transition flex items-center gap-1.5 cursor-pointer">
+            <i class="fa-brands fa-whatsapp text-sm pointer-events-none"></i>
+            <span>WhatsApp ile Paylaş</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
   <!-- MOBILE BOTTOM NAVIGATION BAR -->
   <nav class="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200/90 shadow-[0_-4px_25px_rgba(0,0,0,0.08)] px-1 py-1 flex justify-around items-center safe-area-bottom">
     <button onclick="switchTab('today')" id="mobile-tab-btn-today" class="mobile-nav-btn active flex flex-col items-center justify-center flex-1 py-1.5 text-blue-600 transition touch-manipulation">
@@ -1418,7 +1858,7 @@
   <audio id="successAudio" preload="auto" src="https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3"></audio>
 
   <!-- Load Data and Main Script -->
-  <script src="data.js?v=20261010_24"></script>
-  <script src="app.js?v=20261010_24"></script>
+  <script src="data.js?v=20261023_genel1"></script>
+  <script src="app.js?v=20261023_genel1"></script>
 </body>
 </html>
