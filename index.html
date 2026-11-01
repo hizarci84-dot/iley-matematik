@@ -137,11 +137,12 @@
           <span id="headerCompletedCount">0</span>/<span id="headerTotalDaysCount">202</span> Görev
         </div>
 
-        <!-- Cloud Status Indicator -->
-        <div id="cloudStatusBadge" onclick="switchTab('settings')" title="Bulut Senkronizasyon Durumu" class="cursor-pointer bg-white/10 hover:bg-white/20 text-white/90 px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition">
+        <!-- Cloud Status Indicator (Tek Tıkla Canlı Drive Eşitleme) -->
+        <button type="button" id="cloudStatusBadge" onclick="manualTriggerCloudSync()" title="Google Drive Eşitleme (Tıkla ve Güncelle)" class="bg-white/15 hover:bg-white/25 active:scale-95 text-white/95 px-2.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition touch-manipulation cursor-pointer border border-white/20">
           <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" id="cloudStatusDot"></span>
           <span id="cloudStatusText" class="hidden sm:inline">Bulut Aktif</span>
-        </div>
+          <i id="cloudStatusIcon" class="fa-solid fa-arrows-rotate text-[10px] text-white/80 ml-0.5"></i>
+        </button>
 
         <!-- PWA Install Button -->
         <button id="btnPwaInstallHeader" onclick="promptPwaInstall()" title="Telefona Uygulama Olarak İndir / Yükle" class="bg-amber-400 hover:bg-amber-300 text-slate-900 font-extrabold text-xs px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition shadow-sm active:scale-95">
@@ -1905,7 +1906,7 @@
   <audio id="successAudio" preload="auto" src="https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3"></audio>
 
   <!-- Load Data and Main Script -->
-  <script src="data.js?v=20261023_genel4"></script>
-  <script src="app.js?v=20261023_genel4"></script>
+  <script src="data.js?v=20261101_sync1"></script>
+  <script src="app.js?v=20261101_sync1"></script>
 </body>
 </html>

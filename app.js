@@ -74,6 +74,30 @@ document.addEventListener('DOMContentLoaded', () => {
   window.addEventListener('focus', () => {
     autoSyncFromCloudQuietly();
   });
+
+  // Sayfa gizlendiğinde veya kapatıldığında bekleyen senkronizasyonu anında gönder
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      if (_hasPendingCloudSync) syncProgressToCloudQuietly();
+    } else if (document.visibilityState === 'visible') {
+      autoSyncFromCloudQuietly();
+    }
+  });
+
+  window.addEventListener('pagehide', () => {
+    if (_hasPendingCloudSync) syncProgressToCloudQuietly();
+  });
+
+  // İnternet bağlantısı geri geldiğinde otomatik eşitle
+  window.addEventListener('online', () => {
+    syncProgressToCloudQuietly();
+    autoSyncFromCloudQuietly(true);
+  });
+
+  // Arka planda her 30 saniyede bir yeni ödev kontrolü (Öğretmen ekranının anında güncellenmesi için)
+  setInterval(() => {
+    autoSyncFromCloudQuietly();
+  }, 30000);
   
   // Responsive Canvas Chart Redraw
   window.addEventListener('resize', () => {
@@ -148,14 +172,17 @@ function saveProgress(skipCloudSync = false) {
 // ☁️ OTOMATİK İKİ YÖNLÜ BULUT SENKRONİZASYON MOTORU
 // ----------------------------------------------------------------
 let _cloudSyncTimer = null;
+let _hasPendingCloudSync = false;
+
 function debouncedSyncToCloudQuietly() {
   const scriptUrl = (appState.cloudSettings && appState.cloudSettings.appsScriptUrl || '').trim();
   if (!scriptUrl) return;
 
+  _hasPendingCloudSync = true;
   if (_cloudSyncTimer) clearTimeout(_cloudSyncTimer);
   _cloudSyncTimer = setTimeout(() => {
     syncProgressToCloudQuietly();
-  }, 1200);
+  }, 800);
 }
 
 function syncProgressToCloudQuietly() {
@@ -181,7 +208,8 @@ function syncProgressToCloudQuietly() {
     method: 'POST',
     mode: 'no-cors',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
+    keepalive: true // Sekme kapansa veya arka plana geçse bile isteğin tamamlanmasını sağlar
   }).then(() => {
     console.log('☁️ Veriler arka planda Google Drive\'a eşitlendi.');
     updateCloudStatusBadge(true);
@@ -191,13 +219,13 @@ function syncProgressToCloudQuietly() {
 }
 
 let _lastCloudSyncFetchTime = 0;
-async function autoSyncFromCloudQuietly() {
+async function autoSyncFromCloudQuietly(force = false) {
   const scriptUrl = (appState.cloudSettings && appState.cloudSettings.appsScriptUrl || '').trim();
   if (!scriptUrl) return;
 
-  // Aşırı istek göndermeyi engelle (en az 10 saniyede bir)
+  // Aşırı istek göndermeyi engelle (force olmadıkça en az 8 saniyede bir)
   const now = Date.now();
-  if (now - _lastCloudSyncFetchTime < 10000) return;
+  if (!force && (now - _lastCloudSyncFetchTime < 8000)) return;
   _lastCloudSyncFetchTime = now;
 
   try {
@@ -5100,3 +5128,31 @@ window.isActivityTask = isActivityTask;
 
 
 
+
+// Header veya buton üzerinden anında canlı senkronizasyon tetikleme
+async function manualTriggerCloudSync() {
+  const dot = document.getElementById('cloudStatusDot');
+  const txt = document.getElementById('cloudStatusText');
+  const icon = document.getElementById('cloudStatusIcon');
+
+  if (dot) dot.className = 'w-2 h-2 rounded-full bg-amber-400 animate-ping';
+  if (icon) icon.className = 'fa-solid fa-arrows-rotate text-[10px] text-white animate-spin ml-0.5';
+  if (txt) txt.innerText = 'Eşitleniyor...';
+
+  showToastNotification("☁️ Google Drive'dan güncel veriler çekiliyor...");
+
+  try {
+    syncProgressToCloudQuietly();
+    await autoSyncFromCloudQuietly(true);
+    if (dot) dot.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse';
+    if (icon) icon.className = 'fa-solid fa-arrows-rotate text-[10px] text-white/80 ml-0.5';
+    if (txt) txt.innerText = 'Bulut Güncel';
+    showToastNotification("✅ İlerleme verileri Google Drive ile eşitlendi!");
+  } catch (err) {
+    if (dot) dot.className = 'w-2 h-2 rounded-full bg-rose-400';
+    if (icon) icon.className = 'fa-solid fa-arrows-rotate text-[10px] text-white/80 ml-0.5';
+    if (txt) txt.innerText = 'Bağlantı Hatası';
+    console.warn('Manuel senkronizasyon hatası:', err);
+  }
+}
+window.manualTriggerCloudSync = manualTriggerCloudSync;
