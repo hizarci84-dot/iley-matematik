@@ -449,7 +449,11 @@ function calculateWeeklyStatistics(weekInfo, progress, schedule) {
       allDays = schedule;
     } else if (typeof schedule === "object") {
       for (var key in schedule) {
-        allDays.push(schedule[key]);
+        var dayObj = schedule[key];
+        if (dayObj && typeof dayObj === 'object') {
+          if (!dayObj.date) dayObj.date = key;
+          allDays.push(dayObj);
+        }
       }
     }
   }

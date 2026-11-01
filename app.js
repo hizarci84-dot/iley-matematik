@@ -4627,21 +4627,25 @@ function saveCloudSettings() {
 }
 
 function getCompactSchedule() {
-  const map = {};
   if (STUDY_DATA && Array.isArray(STUDY_DATA.schedule)) {
-    STUDY_DATA.schedule.forEach(day => {
-      map[day.date] = {
-        dayName: day.dayName || '',
-        tasks: (day.tasks || []).map(t => ({
-          book: t.book || '',
-          title: t.title || '',
-          pages: t.pages || '',
-          detail: t.detail || ''
-        }))
-      };
-    });
+    return STUDY_DATA.schedule.map(d => ({
+      date: d.date,
+      dayName: d.dayName || '',
+      weekNo: d.weekNo || 1,
+      isWeekend: !!d.isWeekend,
+      type: d.type || 'test',
+      tasks: (d.tasks || []).map(t => ({
+        id: t.id,
+        type: t.type || 'test',
+        book: t.book || '',
+        title: t.title || '',
+        pages: t.pages || '',
+        questionCount: t.questionCount || (t.tests ? t.tests.reduce((acc, st) => acc + (st.q_count || 0), 0) : 0),
+        detail: t.detail || ''
+      }))
+    }));
   }
-  return map;
+  return [];
 }
 
 function syncScheduleToCloudQuietly() {
