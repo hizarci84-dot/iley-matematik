@@ -20,6 +20,7 @@ let appState = {
     teacherPin: '1984'
   },
   questionsFilter: 'all',
+  deletedQuestionIds: [],
   currentSelectedImageBase64: null,
   currentSelectedImageName: '',
   deferredPrompt: null,
@@ -125,6 +126,7 @@ function loadProgress() {
       appState.completedTasks = parsed.completedTasks || {};
       appState.testResults = parsed.testResults || {};
       appState.questions = parsed.questions || [];
+      appState.deletedQuestionIds = parsed.deletedQuestionIds || [];
       appState.generalTrials = parsed.generalTrials || [];
       appState.cloudSettings = Object.assign(defaultCloud, parsed.cloudSettings || {});
       delete appState.cloudSettings.whatsappGroup;
@@ -150,6 +152,7 @@ function saveProgress(skipCloudSync = false) {
       completedTasks: appState.completedTasks,
       testResults: appState.testResults,
       questions: appState.questions,
+      deletedQuestionIds: appState.deletedQuestionIds || [],
       generalTrials: appState.generalTrials || [],
       cloudSettings: appState.cloudSettings,
       xp: appState.xp,
@@ -196,6 +199,7 @@ function syncProgressToCloudQuietly() {
       completedTasks: appState.completedTasks,
       testResults: appState.testResults,
       questions: appState.questions || [],
+      deletedQuestionIds: appState.deletedQuestionIds || [],
       generalTrials: appState.generalTrials || [],
       xp: appState.xp,
       streak: appState.streak,
@@ -204,12 +208,15 @@ function syncProgressToCloudQuietly() {
     }
   };
 
+  const jsonStr = JSON.stringify(payload);
+  const isSmall = jsonStr.length < 60000; // Chrome keepalive sınırı maksimum 64KB'dır
+
   fetch(scriptUrl, {
     method: 'POST',
     mode: 'no-cors',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify(payload),
-    keepalive: true // Sekme kapansa veya arka plana geçse bile isteğin tamamlanmasını sağlar
+    body: jsonStr,
+    keepalive: isSmall
   }).then(() => {
     console.log('☁️ Veriler arka planda Google Drive\'a eşitlendi.');
     updateCloudStatusBadge(true);
@@ -255,10 +262,67 @@ async function autoSyncFromCloudQuietly(force = false) {
         }
       }
 
-      // 3. Yapılamayan Soruları Birleştir
-      if (Array.isArray(cloudData.questions) && cloudData.questions.length > 0) {
-        if (JSON.stringify(appState.questions) !== JSON.stringify(cloudData.questions)) {
-          appState.questions = cloudData.questions;
+      // 3. Yapılamayan Soruları Akıllı İki Yönlü Birleştirme (Kayıp ve Geri Gelme Önleyici)
+      if (Array.isArray(cloudData.questions)) {
+        const localList = appState.questions || [];
+        const cloudList = cloudData.questions || [];
+        const localMap = {};
+        localList.forEach(q => { localMap[q.id] = q; });
+        const cloudMap = {};
+        cloudList.forEach(q => { cloudMap[q.id] = q; });
+
+        // Silinen soruların buluttan tekrar dirilmesini önle
+        const deletedSet = new Set(appState.deletedQuestionIds || []);
+        if (Array.isArray(cloudData.deletedQuestionIds)) {
+          cloudData.deletedQuestionIds.forEach(id => deletedSet.add(id));
+        }
+        appState.deletedQuestionIds = Array.from(deletedSet);
+
+        const mergedMap = {};
+        let questionsChanged = false;
+
+        // 1. Önce yerel soruları işle
+        for (const localQ of localList) {
+          if (deletedSet.has(localQ.id)) {
+            questionsChanged = true;
+            continue;
+          }
+          const cloudQ = cloudMap[localQ.id];
+          if (!cloudQ) {
+            // Sadece yerelde var, koru
+            mergedMap[localQ.id] = localQ;
+          } else {
+            // Her iki tarafta da var: Durumları birleştir
+            // Eğer herhangi bir tarafta çözüldü (solved: true) yapılmışsa, çözüldü KAZANIR
+            const isSolved = (localQ.solved === true || cloudQ.solved === true);
+            const merged = {
+              ...cloudQ,
+              ...localQ,
+              imageData: localQ.imageData || cloudQ.imageData,
+              solved: isSolved,
+              solvedAt: localQ.solvedAt || cloudQ.solvedAt || (isSolved ? new Date().toISOString() : null)
+            };
+            if (localQ.solved !== isSolved) {
+              questionsChanged = true;
+            }
+            mergedMap[localQ.id] = merged;
+          }
+        }
+
+        // 2. Bulutta olup yerelde henüz olmayan soruları ekle
+        for (const cloudQ of cloudList) {
+          if (deletedSet.has(cloudQ.id)) continue;
+          if (!mergedMap[cloudQ.id]) {
+            mergedMap[cloudQ.id] = cloudQ;
+            questionsChanged = true;
+          }
+        }
+
+        const mergedArray = Object.values(mergedMap);
+        mergedArray.sort((a, b) => ((b.createdAt || 0) > (a.createdAt || 0) ? 1 : -1));
+
+        if (questionsChanged || mergedArray.length !== localList.length) {
+          appState.questions = mergedArray;
           hasChanges = true;
         }
       }
@@ -4472,8 +4536,9 @@ function renderQuestionsView() {
                 </a>
               ` : ''}
 
-              <button type="button" onclick="toggleQuestionSolved('${q.id}')" title="${isSolved ? 'Bekliyor olarak işaretle' : 'Çözüldü olarak işaretle'}" class="w-7 h-7 rounded-lg ${isSolved ? 'bg-amber-50 text-amber-700 hover:bg-amber-100 border-amber-200' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200'} border flex items-center justify-center transition text-xs cursor-pointer">
-                <i class="fa-solid ${isSolved ? 'fa-rotate-left' : 'fa-check'}"></i>
+              <button type="button" onclick="toggleQuestionSolved('${q.id}')" title="${isSolved ? 'Tekrar bekliyor olarak işaretle' : 'Çözüldü olarak işaretle'}" class="px-2.5 py-1 rounded-lg ${isSolved ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-800 border-emerald-300' : 'bg-white hover:bg-emerald-50 text-emerald-700 border-emerald-300 shadow-xs'} border flex items-center gap-1 transition text-xs font-bold cursor-pointer">
+                <i class="fa-solid ${isSolved ? 'fa-circle-check text-emerald-600' : 'fa-check text-emerald-600'}"></i>
+                <span>${isSolved ? 'Çözüldü' : 'Çözüldü Yap'}</span>
               </button>
 
               <button type="button" onclick="deleteQuestion('${q.id}')" title="Soruyu Sil" class="w-7 h-7 rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 flex items-center justify-center transition text-xs cursor-pointer">
@@ -4496,18 +4561,29 @@ function toggleQuestionSolved(id) {
   const item = (appState.questions || []).find(q => q.id === id);
   if (item) {
     item.solved = !item.solved;
-    saveProgress();
+    item.solvedAt = item.solved ? new Date().toISOString() : null;
+    item.updatedAt = Date.now();
+    saveProgress(true);
     renderQuestionsView();
     updateQuestionsBadge();
+    syncProgressToCloudQuietly();
+    const msg = item.solved 
+      ? `✅ "${item.title || 'Soru'}" çözüldü olarak işaretlendi!` 
+      : `🔄 "${item.title || 'Soru'}" tekrar bekleyenlere alındı.`;
+    showToastNotification(msg);
   }
 }
 
 function deleteQuestion(id) {
   if (confirm("Bu soruyu soru havuzunuzdan silmek istediğinize emin misiniz?")) {
+    if (!appState.deletedQuestionIds) appState.deletedQuestionIds = [];
+    appState.deletedQuestionIds.push(id);
     appState.questions = (appState.questions || []).filter(q => q.id !== id);
-    saveProgress();
+    saveProgress(true);
     renderQuestionsView();
     updateQuestionsBadge();
+    syncProgressToCloudQuietly();
+    showToastNotification("🗑️ Soru silindi.");
   }
 }
 
@@ -4578,6 +4654,15 @@ function updateQuestionsBadge() {
       mobileBadge.classList.add('hidden');
     }
   }
+
+  // Soru Havuzu Sekmesindeki Sayaçlar
+  const list = appState.questions || [];
+  const elAll = document.getElementById('qCountAll');
+  const elPending = document.getElementById('qCountPending');
+  const elSolved = document.getElementById('qCountSolved');
+  if (elAll) elAll.innerText = list.length;
+  if (elPending) elPending.innerText = pendingCount;
+  if (elSolved) elSolved.innerText = list.length - pendingCount;
 }
 
 // Kitap Adını Anlaşılır Metne Çeviren Yardımcı Fonksiyon

@@ -184,6 +184,7 @@
         <button onclick="switchTab('questions')" id="tab-btn-questions" class="nav-tab flex items-center gap-2 px-3 py-1.5 rounded-lg font-medium transition text-white/80 hover:text-white hover:bg-white/10">
           <i class="fa-solid fa-circle-question text-rose-300"></i>
           <span>Yapamadığım Sorular</span>
+          <span id="badgeHeaderQuestionsCount" class="hidden bg-rose-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full shadow-xs">0</span>
         </button>
         <button onclick="switchTab('badges')" id="tab-btn-badges" class="nav-tab flex items-center gap-2 px-3 py-1.5 rounded-lg font-medium transition text-white/80 hover:text-white hover:bg-white/10">
           <i class="fa-solid fa-medal text-yellow-300"></i>
@@ -1881,7 +1882,7 @@
     <button onclick="switchTab('questions')" id="mobile-tab-btn-questions" class="mobile-nav-btn flex flex-col items-center justify-center flex-1 py-1.5 text-slate-500 hover:text-rose-600 transition touch-manipulation">
       <div class="relative">
         <i class="fa-solid fa-camera-retro text-base"></i>
-        <span id="mobileBadgeQuestionsCount" class="hidden absolute -top-1 -right-2 bg-rose-600 text-white text-[7px] font-black px-1 rounded-full">0</span>
+        <span id="mobileBadgeQuestionsCount" class="hidden absolute -top-1.5 -right-2.5 bg-rose-600 text-white text-[9px] font-black min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center shadow-xs">0</span>
       </div>
       <span class="text-[9px] font-medium mt-0.5">Sorular</span>
     </button>
@@ -1906,7 +1907,7 @@
   <audio id="successAudio" preload="auto" src="https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3"></audio>
 
   <!-- Load Data and Main Script -->
-  <script src="data.js?v=20261101_weekly1"></script>
-  <script src="app.js?v=20261101_weekly1"></script>
+  <script src="data.js?v=20261102_qsync1"></script>
+  <script src="app.js?v=20261102_qsync1"></script>
 </body>
 </html>
