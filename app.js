@@ -159,7 +159,20 @@ function saveProgress(skipCloudSync = false) {
       streak: appState.streak,
       lastStreakDate: appState.lastStreakDate
     };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
+    } catch (quotaErr) {
+      console.warn('⚠️ localStorage doldu, eski görseller hafifletilerek kaydediliyor...', quotaErr);
+      if (Array.isArray(dataToSave.questions) && dataToSave.questions.length > 5) {
+        dataToSave.questions = dataToSave.questions.map((q, idx) => {
+          if (idx >= 5 && (q.solved || q.driveUrl)) {
+            return { ...q, imageData: q.driveUrl || '' };
+          }
+          return q;
+        });
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
+      }
+    }
     updateQuestionsBadge();
 
     // Arka planda sessizce Google Drive'a yedekle
@@ -4385,7 +4398,8 @@ function handleQuestionImageSelect(event) {
     const img = new Image();
     img.onload = function() {
       // Resmi maksimum 1280px genişlik/yükseklikle sıkıştır (performans ve Drive kotası için)
-      const maxDim = 1280;
+      // Resmi maksimum 1000px genişlik/yükseklikle optimize et (net yazı, optimum dosya boyutu)
+      const maxDim = 1000;
       let width = img.width;
       let height = img.height;
 
@@ -4403,8 +4417,8 @@ function handleQuestionImageSelect(event) {
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, width, height);
 
-      // JPEG formatında %82 kalitede Base64'e dönüştür
-      const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.82);
+      // JPEG formatında %75 kalitede Base64'e dönüştür
+      const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.75);
       appState.currentSelectedImageBase64 = compressedDataUrl;
 
       // Önizlemeyi göster
