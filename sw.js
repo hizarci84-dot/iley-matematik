@@ -1,5 +1,5 @@
 // Service Worker for İley 6. Sınıf Matematik PWA
-const CACHE_NAME = 'iley-math-pwa-v31';
+const CACHE_NAME = 'iley-math-pwa-v32';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

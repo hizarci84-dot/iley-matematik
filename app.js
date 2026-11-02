@@ -502,8 +502,8 @@ function switchTab(tabId) {
   // Refresh tab-specific renders
   if (tabId === 'today') renderTodayView();
   else if (tabId === 'schedule') renderScheduleView();
-  else if (tabId === 'denemeler') renderDenemelerView();
-  else if (tabId === 'genel-denemeler') renderGeneralTrialsView();
+  else if (tabId === 'denemeler') { renderDenemelerView(); requestAnimationFrame(() => renderDenemelerView()); }
+  else if (tabId === 'genel-denemeler') { renderGeneralTrialsView(); requestAnimationFrame(() => renderGeneralTrialsView()); }
   else if (tabId === 'books') renderBooksView();
   else if (tabId === 'badges') renderBadgesView();
   else if (tabId === 'questions') renderQuestionsView();
@@ -962,10 +962,12 @@ function renderDenemelerView() {
     const res = appState.testResults[task.id];
     chartLabels.push(`D${idx+1}`);
 
-    if (isDone && res) {
+    const hasResult = (res && res.net !== undefined && res.net !== null && res.net !== '');
+    if (hasResult || (isDone && res)) {
       completedCount++;
-      totalNet += parseFloat(res.net) || 0;
-      chartData.push(parseFloat(res.net) || 0);
+      const netVal = parseFloat(res.net) || 0;
+      totalNet += netVal;
+      chartData.push(netVal);
     } else {
       chartData.push(null);
     }
@@ -1030,94 +1032,205 @@ function renderDenemeChart(labels, data) {
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
 
-  // Handle high-dpi displays
-  const dpr = window.devicePixelRatio || 1;
+  // Handle responsive canvas sizing with solid fallbacks
+  const parent = canvas.parentElement;
   const rect = canvas.getBoundingClientRect();
-  canvas.width = rect.width * dpr;
-  canvas.height = rect.height * dpr;
-  ctx.scale(dpr, dpr);
+  const parentRect = parent ? parent.getBoundingClientRect() : null;
 
-  const w = rect.width;
-  const h = rect.height;
-  const padLeft = 40;
-  const padRight = 20;
-  const padTop = 20;
-  const padBottom = 30;
+  let w = rect.width;
+  if (!w || w < 50) {
+    w = (parentRect && parentRect.width > 50) ? parentRect.width : ((parent && parent.clientWidth > 50) ? parent.clientWidth : 600);
+  }
+  let h = rect.height;
+  if (!h || h < 50) {
+    h = (parentRect && parentRect.height > 50) ? parentRect.height : ((parent && parent.clientHeight > 50) ? parent.clientHeight : 260);
+  }
+  w = Math.round(w);
+  h = Math.round(h);
+
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.round(w * dpr);
+  canvas.height = Math.round(h * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  const padLeft = 45;
+  const padRight = 25;
+  const padTop = 32;
+  const padBottom = 35;
+  const chartW = w - padLeft - padRight;
+  const chartH = h - padTop - padBottom;
 
   ctx.clearRect(0, 0, w, h);
 
-  // Draw Horizontal Gridlines (0, 5, 10, 15, 20 net)
-  ctx.strokeStyle = '#e2e8f0';
+  // 1. Yatay Izgara Çizgileri (0, 5, 10, 15, 20 net)
+  ctx.strokeStyle = '#f1f5f9';
   ctx.lineWidth = 1;
   ctx.font = '11px sans-serif';
   ctx.fillStyle = '#94a3b8';
   ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
 
   for (let score = 0; score <= 20; score += 5) {
-    const y = padTop + (h - padTop - padBottom) * (1 - score / 20);
+    const y = padTop + chartH * (1 - score / 20);
     ctx.beginPath();
     ctx.moveTo(padLeft, y);
     ctx.lineTo(w - padRight, y);
     ctx.stroke();
-    ctx.fillText(`${score}`, padLeft - 8, y + 4);
+    ctx.fillText(`${score}`, padLeft - 8, y);
   }
 
-  // Plot Data Points
-  const stepX = (w - padLeft - padRight) / (labels.length - 1);
+  // 2. 20 Net Hedef Çizgisi (Kesikli Yeşil Çizgi)
+  const targetY = padTop; // 20 Net en üstte
+  ctx.save();
+  ctx.setLineDash([5, 4]);
+  ctx.strokeStyle = '#10b981';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(padLeft, targetY);
+  ctx.lineTo(w - padRight, targetY);
+  ctx.stroke();
+  ctx.restore();
+
+  // Hedef Etiketi (Sağ üst)
+  ctx.fillStyle = '#059669';
+  ctx.font = 'bold 10px sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillText('🎯 Hedef 20 Net', w - padRight, targetY - 10);
+
+  // 3. Veri Noktalarını Hesapla
+  const stepX = chartW / (labels.length - 1);
   const points = [];
 
   labels.forEach((lbl, i) => {
     const x = padLeft + i * stepX;
     const val = data[i];
     if (val !== null && !isNaN(val)) {
-      const y = padTop + (h - padTop - padBottom) * (1 - Math.max(0, Math.min(20, val)) / 20);
-      points.push({ x, y, val, idx: i });
+      const clampedVal = Math.max(0, Math.min(20, val));
+      const y = padTop + chartH * (1 - clampedVal / 20);
+      points.push({ x, y, val, idx: i, lbl });
     }
   });
 
-  // Draw Line
+  // 4. Veri Varsa Çizgi, Alan ve Noktaları Çiz
   if (points.length > 0) {
-    ctx.beginPath();
-    ctx.strokeStyle = '#f59e0b';
-    ctx.lineWidth = 3;
-    points.forEach((p, idx) => {
-      if (idx === 0) ctx.moveTo(p.x, p.y);
-      else ctx.lineTo(p.x, p.y);
-    });
-    ctx.stroke();
+    if (points.length > 1) {
+      // Alan Gradyanı (Hafif turuncu dolgu)
+      const grad = ctx.createLinearGradient(0, padTop, 0, padTop + chartH);
+      grad.addColorStop(0, 'rgba(245, 158, 11, 0.22)');
+      grad.addColorStop(1, 'rgba(245, 158, 11, 0.01)');
 
-    // Draw Points
-    points.forEach(p => {
       ctx.beginPath();
-      ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+      ctx.moveTo(points[0].x, padTop + chartH);
+      points.forEach(p => ctx.lineTo(p.x, p.y));
+      ctx.lineTo(points[points.length - 1].x, padTop + chartH);
+      ctx.closePath();
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      // Bağlantı Çizgisi
+      ctx.beginPath();
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      points.forEach((p, idx) => {
+        if (idx === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+      });
+      ctx.stroke();
+    } else {
+      // Tek Deneme Tamamlandığında (örnek: D1)
+      const p = points[0];
+      // X eksenine doğru kesikli rehber çizgisi
+      ctx.save();
+      ctx.setLineDash([3, 3]);
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(p.x, padTop + chartH);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Her Noktayı ve Değer Rozetini Çiz
+    points.forEach((p, idx) => {
+      const isLatest = (idx === points.length - 1);
+
+      // Son noktanın etrafında ışıltı halkası
+      if (isLatest) {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 11, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(245, 158, 11, 0.25)';
+        ctx.fill();
+      }
+
+      // Nokta gövdesi (İçi beyaz, çerçevesi amber)
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, isLatest ? 6 : 5, 0, Math.PI * 2);
       ctx.fillStyle = '#ffffff';
       ctx.fill();
       ctx.strokeStyle = '#d97706';
       ctx.lineWidth = 2.5;
       ctx.stroke();
 
-      // Text label above point
-      ctx.fillStyle = '#1e293b';
-      ctx.font = 'bold 10px sans-serif';
+      // Skor Rozeti
+      const scoreText = `${p.val} Net`;
+      ctx.font = 'bold 11px sans-serif';
+      const textW = ctx.measureText(scoreText).width;
+      const badgeW = textW + 12;
+      const badgeH = 20;
+
+      let badgeX = p.x - badgeW / 2;
+      if (badgeX < padLeft) badgeX = padLeft;
+      if (badgeX + badgeW > w - padRight) badgeX = w - padRight - badgeW;
+      const badgeY = p.y - badgeH - 6;
+
+      ctx.fillStyle = '#fef3c7'; // amber-100
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      if (ctx.roundRect) {
+        ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 6);
+      } else {
+        ctx.rect(badgeX, badgeY, badgeW, badgeH);
+      }
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#92400e'; // amber-900
       ctx.textAlign = 'center';
-      ctx.fillText(`${p.val}`, p.x, p.y - 8);
+      ctx.textBaseline = 'middle';
+      ctx.fillText(scoreText, badgeX + badgeW / 2, badgeY + badgeH / 2);
     });
   } else {
-    // If no denemes solved yet, draw placeholder text
+    // Henüz çözülen deneme yoksa rehber mesajı
     ctx.fillStyle = '#94a3b8';
     ctx.font = '13px sans-serif';
     ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
     ctx.fillText('Henüz çözülen deneme yok. Deneme çözdükçe net grafiğin burada oluşacaktır!', w / 2, h / 2);
   }
 
-  // Draw X labels (every 2 denemes to prevent clutter)
-  ctx.fillStyle = '#64748b';
-  ctx.font = '10px sans-serif';
+  // 5. X Ekseni Etiketleri (D1 ... D26)
+  ctx.textBaseline = 'alphabetic';
   ctx.textAlign = 'center';
+  const isMobile = w < 520;
+
   labels.forEach((lbl, i) => {
-    if (i % 2 === 0 || i === labels.length - 1) {
+    // Mobilde 4'te bir, masaüstünde 2'de bir, D1 ve D26 her zaman
+    const shouldShow = (i === 0) || (i === labels.length - 1) || (isMobile ? (i % 4 === 0) : (i % 2 === 0));
+    if (shouldShow) {
       const x = padLeft + i * stepX;
-      ctx.fillText(lbl, x, h - 10);
+      const isCompleted = data[i] !== null && !isNaN(data[i]);
+      if (isCompleted) {
+        ctx.fillStyle = '#d97706';
+        ctx.font = 'bold 11px sans-serif';
+      } else {
+        ctx.fillStyle = '#64748b';
+        ctx.font = '10px sans-serif';
+      }
+      ctx.fillText(lbl, x, h - 12);
     }
   });
 }
@@ -2065,14 +2178,26 @@ function renderGeneralTrialsChart() {
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
 
-  const dpr = window.devicePixelRatio || 1;
+  // Handle responsive canvas sizing with solid fallbacks
+  const parent = canvas.parentElement;
   const rect = canvas.getBoundingClientRect();
-  canvas.width = rect.width * dpr;
-  canvas.height = rect.height * dpr;
-  ctx.scale(dpr, dpr);
+  const parentRect = parent ? parent.getBoundingClientRect() : null;
 
-  const w = rect.width;
-  const h = rect.height;
+  let w = rect.width;
+  if (!w || w < 50) {
+    w = (parentRect && parentRect.width > 50) ? parentRect.width : ((parent && parent.clientWidth > 50) ? parent.clientWidth : 600);
+  }
+  let h = rect.height;
+  if (!h || h < 50) {
+    h = (parentRect && parentRect.height > 50) ? parentRect.height : ((parent && parent.clientHeight > 50) ? parent.clientHeight : 260);
+  }
+  w = Math.round(w);
+  h = Math.round(h);
+
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.round(w * dpr);
+  canvas.height = Math.round(h * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   const padLeft = 45;
   const padRight = 25;
   const padTop = 25;
